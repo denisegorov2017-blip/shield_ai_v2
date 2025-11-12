@@ -18,6 +18,7 @@ install:
 	poetry install
 
 run:
+	bash ./scripts/link_pages.sh
 	poetry run streamlit run main.py
 
 init-db:
