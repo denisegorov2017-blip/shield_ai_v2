@@ -1,0 +1,3 @@
+"""
+Infrastructure layer - Внешние зависимости
+"""
