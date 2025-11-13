@@ -15,7 +15,7 @@
 import math
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Type
 
 
 class ShrinkageStrategy(ABC):
@@ -169,6 +169,19 @@ class WeightedStrategy(ShrinkageStrategy):
         Returns:
             Общая усушка за период
         """
+        # Извлечение параметров из batch_data
+        a, b = coeffs["a"], coeffs["b"]
+        M0 = batch_data["initial_mass"]
+        current_mass = M0
+        arrival_date = batch_data["arrival_date"]
+        end_date = batch_data["end_date"]
+        daily_sales = batch_data.get("daily_sales", {})
+
+        # Инициализация переменных для цикла
+        current_date = arrival_date
+        day_counter = 0
+        total_shrinkage = 0.0
+
         while current_date <= end_date:
             # Вычисление скорости усушки: M0 * a * b * e^(-b * day_counter)
             # Это производная от функции усушки по времени

@@ -4,9 +4,7 @@ Streamlit страница: Калибровка коэффициентов
 
 import streamlit as st
 
-from shield_ai.application.use_cases.calibrate_coefficients import (
-    CalibrateCoefficientsUseCase,
-)
+from shield_ai.application.use_cases.calibrate_coefficients import CalibrateCoefficientsUseCase
 from shield_ai.infrastructure.database.session import get_session
 
 st.header("⚙️ Калибровка коэффициентов")

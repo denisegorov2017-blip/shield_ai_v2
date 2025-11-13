@@ -5,9 +5,7 @@ Streamlit страница: Анализ усушки
 import pandas as pd
 import streamlit as st
 
-from shield_ai.application.use_cases.calibrate_coefficients import (
-    CalibrateCoefficientsUseCase,
-)
+from shield_ai.application.use_cases.calibrate_coefficients import CalibrateCoefficientsUseCase
 from shield_ai.application.use_cases.forecast_shrinkage import ForecastShrinkageUseCase
 from shield_ai.infrastructure.database.session import get_session
 
