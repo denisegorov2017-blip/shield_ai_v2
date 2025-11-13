@@ -27,6 +27,15 @@ init-db:
 test:
 	poetry run pytest tests/ -v
 
+test-unit:
+	poetry run pytest tests/unit/ -v
+
+test-integration:
+	poetry run pytest tests/integration/ -v
+
+test-validation:
+	poetry run pytest tests/validation/ -v
+
 lint:
 	poetry run ruff check src/ tests/
 

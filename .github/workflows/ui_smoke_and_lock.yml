@@ -1,0 +1,50 @@
+name: UI Smoke and Lock Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ui-health-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.12
+
+    - name: Install dependencies
+      run: |
+        pip install poetry
+        poetry install
+
+    - name: Start UI in background
+      run: |
+        # Запускаем UI в фоновом режиме на порту 8501 (по умолчанию для Streamlit)
+        timeout 60s poetry run streamlit run main.py --server.port 8501 --server.headless true &
+        # Ждем немного, чтобы UI успел запуститься
+        sleep 10
+
+    - name: Check if UI is accessible
+      run: |
+        # Проверяем, доступен ли UI, делая HTTP-запрос к основной странице
+        # Устанавливаем curl, если его нет
+        sudo apt-get update
+        sudo apt-get install -y curl
+        # Проверяем доступность UI
+        for i in {1..10}; do
+          if curl -f http://localhost:8501/_stcore/health; then
+            echo "UI is accessible"
+            exit 0
+          fi
+          echo "Waiting for UI to be accessible..."
+          sleep 5
+        done
+        echo "UI is not accessible after 50 seconds"
+        exit 1
