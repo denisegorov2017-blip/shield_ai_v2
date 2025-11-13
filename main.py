@@ -2,20 +2,21 @@
 Shield AI - Intelligent Inventory Management System
 Единая точка входа для Streamlit Dashboard
 """
+
 import sys
 from pathlib import Path
 
+import streamlit as st
+
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-import streamlit as st
 
 # Настройка страницы
 st.set_page_config(
     page_title="Shield AI Dashboard",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Главная страница
@@ -34,18 +35,21 @@ with col3:
 
 # Навигация
 st.sidebar.title("Навигация")
-st.sidebar.info("""
+st.sidebar.info(
+    """
 **Выберите раздел:**
 - 📊 Dashboard - Обзор метрик
 - 📁 Парсинг - Загрузка Excel отчётов
 - ⚙️ Калибровка - Расчёт коэффициентов
 - 🔮 Прогноз - Прогнозирование усушки
 - 📊 Коэффициенты - Таблица коэффициентов
-""")
+"""
+)
 
 # Информация о системе
 with st.expander("ℹ️ О системе"):
-    st.markdown("""
+    st.markdown(
+        """
     ### Shield AI v2.0
     
     **Архитектура:**
@@ -64,7 +68,8 @@ with st.expander("ℹ️ О системе"):
     - SQLAlchemy 2.0
     - Pandas для обработки данных
     - Scipy для оптимизации
-    """)
+    """
+    )
 
 # Footer
 st.sidebar.divider()
