@@ -1,6 +1,6 @@
 # Makefile for Shield AI v2.0
 
-.PHONY: help install run test lint format ci
+.PHONY: help install run test lint format mypy pyright pylint ci
 
 help:
 	@echo "🛡️ Shield AI - Команды разработки"
@@ -10,8 +10,10 @@ help:
 	@echo "make init-db   - Инициализация БД"
 	@echo "make test      - Запуск тестов"
 	@echo "make lint      - Линтинг (ruff)"
+	@echo "make pylint    - Проверка стиля кода (pylint)"
 	@echo "make format    - Форматирование (black+isort)"
-	@echo "make mypy      - Проверка типов"
+	@echo "make mypy      - Проверка типов (mypy)"
+	@echo "make pyright   - Проверка типов (pyright)"
 	@echo "make ci        - Полный CI пайплайн"
 
 install:
@@ -39,6 +41,9 @@ test-validation:
 lint:
 	poetry run ruff check src/ tests/
 
+pylint:
+	poetry run pylint src/ tests/
+
 format:
 	poetry run black src/ tests/
 	poetry run isort src/ tests/
@@ -46,5 +51,8 @@ format:
 mypy:
 	poetry run mypy src/
 
-ci: format lint mypy test
+pyright:
+	poetry run pyright
+
+ci: format lint mypy pyright test
 	@echo "✅ CI пройден!"

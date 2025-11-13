@@ -1,0 +1,33 @@
+{
+  "include": [
+    "src",
+    "tests",
+    "scripts",
+    "src/shield_ai/presentation/ui/pages"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "src/shield_ai/py.typed",
+    ".venv",
+    "venv",
+    ".git"
+  ],
+  "defineConstant": {
+    "DEBUG": true
+ },
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.12",
+  "pythonPlatform": "All",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.12",
+      "pythonPlatform": "All",
+      "extraPaths": [
+        "src"
+      ]
+    }
+  ]
+}

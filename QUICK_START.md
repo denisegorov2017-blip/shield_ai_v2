@@ -59,7 +59,8 @@ make run
 make help       # Показать все команды
 make format     # Форматирование кода (black + isort)
 make lint       # Линтинг (ruff)
-make mypy       # Проверка типов
+make mypy       # Проверка типов (mypy)
+make pyright    # Проверка типов (pyright)
 make test       # Запуск тестов
 make ci         # Полный CI пайплайн
 ```

@@ -1,0 +1,189 @@
+[MASTER]
+# Specify a score threshold under which the program will exit with error.
+fail-under = 8.0
+
+# Files or directories to be skipped. They should be base names, not paths.
+ignore = .git,.venv,__pycache__,venv,env,build,dist,*.egg
+
+# Files or directories for which the content of a package's __init__.py 
+# file is significant and should not be ignored.
+ignore-paths = 
+
+# Add files or directories matching these patterns to the list of ignored 
+# resources (use fnmatch pattern matching).
+ignore-patterns = 
+
+# DEPRECATED: Use ignore-paths instead. Add files or directories matching 
+# these patterns to the list of ignored resources (use fnmatch pattern matching).
+ignore-paths-regex = 
+
+# Python code to execute, usually for sys.path manipulation.
+init-hook = 
+
+# Use multiple processes to speed up Pylint. Each pylint worker processes 
+# files in parallel.
+jobs = 1
+
+# List of plugins (as comma separated values of python module names) to load, 
+# usually to register additional checkers.
+load-plugins = 
+
+# Pickle collected data for later comparisons.
+persistent = yes
+
+# Specify a configuration file.
+# rcfile = 
+
+# Allow loading of arbitrary C extensions. Extensions are imported into 
+# the active Python interpreter and may run arbitrary code.
+unsafe-load-any-extension = no
+
+
+[MESSAGES CONTROL]
+# Only show warnings with the listed confidence levels. Leave empty to show
+# all. Valid levels: HIGH, CONTROL_FLOW, INFERENCE, INFERENCE_FAILURE, UNDEFINED
+confidence = 
+
+# Enable the message, report, category or checker with the given id(s). You can
+# either give multiple identifier separated by comma (,) or put this option
+# multiple time (only on the command line, not in the configuration file where
+# it should appear only once). See also the "--disable" option for examples.
+enable = 
+
+# Disable the message, report, category or checker with the given id(s). You
+# can either give multiple identifiers separated by comma (,) or put this
+# option multiple times (only on the command line, not in the configuration
+# file where it should appear only once).
+# Possible values for the id(s) are:
+# * all: disable everything
+# * W: disable all warnings
+# * R: disable all refactor recommendations
+# * C: disable all conventions
+# * E: disable all errors
+# * [specific-msg-id]: disable that specific message id
+disable = C0103,C0114,C0115,C0116,C0301,R0903,R0913,W0613
+
+
+[REPORTS]
+# Set the output format. Available formats are text, parseable, colorized, json
+# and msvs (visual studio).
+output-format = text
+
+# Tells whether to display a full report or only the messages.
+reports = no
+
+# Python expression which should return a note less than 10 (10 is the highest
+# note). You have access to the variables errors, warnings, statement which
+# respectively contain the number of errors, warnings and executed statements
+# found in the code.
+evaluation = 10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length = 88
+
+# Maximum number of lines in a module.
+max-module-lines = 1000
+
+# String used as indentation unit. This is usually " " (4 spaces) or "\t" (1 tab).
+# The internal Pylint check for this uses Python's tokenize module to check
+# whitespace, so any explicit indentation characters will be honored as such
+# (including mixtures). Use "tab" to have Pylint check for hard tabs.
+indent-string = '    '
+
+
+[TYPECHECK]
+# List of module names for which member attributes should not be checked
+# (useful for modules/projects where namespaces are manipulated during runtime
+# and thus existing member attributes cannot be deduced by static analysis).
+ignored-modules = 
+
+# List of classes names for which member attributes should not be checked
+# (useful for classes with dynamically set attributes).
+# This supports the use of qualified names.
+ignored-classes = Exception,BaseException
+
+
+[VARIABLES]
+# List of additional names supposed to be defined in builtins. Remember that
+# you should avoid defining new builtins when possible.
+additional-builtins = 
+
+# List of strings which can identify a callback function by name. A callback
+# name must start or end with one of those strings.
+callbacks = callback,cb,_cb
+
+
+[DESIGN]
+# Maximum number of arguments for function / method.
+max-args = 5
+
+# Maximum number of locals for function / method body.
+max-locals = 15
+
+# Maximum number of return / yield for function / method body.
+max-returns = 6
+
+# Maximum number of branch for function / method body.
+max-branches = 12
+
+# Maximum number of statements in function / method body.
+max-statements = 50
+
+# Maximum number of parents for a class (see R0901).
+max-parents = 7
+
+# Maximum number of attributes for a class (see R0902).
+max-attributes = 7
+
+# Minimum number of public methods for a class (see R0903).
+min-public-methods = 0
+
+# Maximum number of public methods for a class (see R0904).
+max-public-methods = 20
+
+
+[IMPORTS]
+# Deprecated modules which should not be used, separated by a comma.
+deprecated-modules = 
+
+# Create a graph of every (i.e. internal and external) dependencies in the
+# given file (report RP0402 must not be disabled).
+import-graph = 
+
+# Create a graph of external dependencies in the given file (report RP0402 must
+# not be disabled).
+ext-import-graph = 
+
+# Create a graph of internal dependencies in the given file (report RP0402 must
+# not be disabled).
+int-import-graph = 
+
+# Force import order to recognize a module as part of the standard
+# compatibility libraries.
+known-standard-library = 
+
+# Force import order to recognize a module as part of a third party library.
+known-third-party = 
+
+# Analyse import fallback blocks. This can be used to support both Python 2 and
+# Python 3 compatible code, which means that the block might have code that
+# imports from a module that is not available in the target interpreter.
+analyse-fallback-blocks = no
+
+
+[CLASSES]
+# List of method names used to declare (i.e. assign) instance attributes.
+defining-attr-methods = __init__,__new__,setUp
+
+# List of member names, which should be excluded from the protected access
+# warning.
+exclude-protected = _asdict,_fields,_replace,_source,_make
+
+
+[EXCEPTIONS]
+# Exceptions that will emit a warning when being caught. Defaults to
+# "BaseException, StopIteration, GeneratorExit, KeyboardInterrupt,
+# SystemExit, and Warning".
+overgeneral-exceptions = BaseException,StopIteration,GeneratorExit,KeyboardInterrupt,SystemExit,Warning
