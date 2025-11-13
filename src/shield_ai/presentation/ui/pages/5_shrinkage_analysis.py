@@ -2,8 +2,8 @@
 Streamlit страница: Анализ усушки
 """
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 from shield_ai.application.use_cases.calibrate_coefficients import CalibrateCoefficientsUseCase
 from shield_ai.application.use_cases.forecast_shrinkage import ForecastShrinkageUseCase
@@ -25,7 +25,7 @@ tab1, tab2 = st.tabs(["_calibration", "Forecasting"])
 with tab1:
     st.subheader("⚙️ Калибровка коэффициентов")
     st.caption("Используется ПОРЦИОННАЯ модель (99.9% точность)")
-    
+
     st.info(
         """
     **Шаг 1**: Система рассчитает индивидуальные коэффициенты для каждого товара.
@@ -64,7 +64,7 @@ with tab1:
 with tab2:
     st.subheader("🔮 Прогнозирование усушки")
     st.caption("Используется ВЗВЕШЕННАЯ модель (99.5% точность + производительность)")
-    
+
     st.info(
         """
     **Шаг 2**: Система рассчитывает прогноз усушки для всех активных партий.
@@ -98,9 +98,15 @@ with tab2:
                                 with col1:
                                     st.metric("Партия", f["arrival_date"])
                                 with col2:
-                                    st.metric("Прогноз усушки", f"{f['predicted_shrinkage']:.2f} кг")
+                                    st.metric(
+                                        "Прогноз усушки",
+                                        f"{f['predicted_shrinkage']:.2f} кг",
+                                    )
                                 with col3:
-                                    st.metric("Должно остаться", f"{f['theoretical_remaining']:.2f} кг")
+                                    st.metric(
+                                        "Должно остаться",
+                                        f"{f['theoretical_remaining']:.2f} кг",
+                                    )
                                 with col4:
                                     st.metric("Дней хранения", f"{f['days_stored']}")
 
@@ -116,4 +122,6 @@ st.subheader("📈 Визуализация анализа усушки")
 st.write("Здесь будут отображаться интерактивные графики Plotly для анализа усушки.")
 
 # Пример заглушки для графика
-st.plotly_chart(st._main.empty(), use_container_width=True)  # Заглушка для реального графика
+st.plotly_chart(
+    st._main.empty(), use_container_width=True
+)  # Заглушка для реального графика

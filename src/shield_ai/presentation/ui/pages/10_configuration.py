@@ -11,7 +11,7 @@ def main():
     st.text_input("API Endpoint", placeholder="Enter API endpoint...")
     st.text_input("Database Path", placeholder="Enter database path...")
     st.selectbox("Log Level", ["DEBUG", "INFO", "WARNING", "ERROR"])
-    
+
     st.button("Save Configuration")
 
 

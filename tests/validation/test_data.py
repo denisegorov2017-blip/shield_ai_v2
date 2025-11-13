@@ -20,7 +20,9 @@ def add_test_data():
         products = []
         for i in range(1, 4):
             product = ProductModel(
-                name=f"Тестовый товар {i}", group_name=f"Группа {i}", created_at=datetime.now()
+                name=f"Тестовый товар {i}",
+                group_name=f"Группа {i}",
+                created_at=datetime.now(),
             )
             session.add(product)
             products.append(product)
@@ -31,10 +33,11 @@ def add_test_data():
         for i, product in enumerate(products):
             batch = BatchModel(
                 product_id=product.id,
-                arrival_date=(datetime.now() - timedelta(days=random.randint(30, 180))).strftime(
-                    "%d.%m.%Y"
-                ),
-                arrival_datetime=datetime.now() - timedelta(days=random.randint(30, 180)),
+                arrival_date=(
+                    datetime.now() - timedelta(days=random.randint(30, 180))
+                ).strftime("%d.%m.%Y"),
+                arrival_datetime=datetime.now()
+                - timedelta(days=random.randint(30, 180)),
                 initial_qty=random.uniform(100, 500),
                 remaining_qty=random.uniform(50, 300),
             )

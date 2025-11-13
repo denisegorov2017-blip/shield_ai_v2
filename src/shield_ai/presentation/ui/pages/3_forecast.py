@@ -45,9 +45,15 @@ if st.button("🔮 РАССЧИТАТЬ ПРОГНОЗ", type="primary"):
                             with col1:
                                 st.metric("Партия", f["arrival_date"])
                             with col2:
-                                st.metric("Прогноз усушки", f"{f['predicted_shrinkage']:.2f} кг")
+                                st.metric(
+                                    "Прогноз усушки",
+                                    f"{f['predicted_shrinkage']:.2f} кг",
+                                )
                             with col3:
-                                st.metric("Должно остаться", f"{f['theoretical_remaining']:.2f} кг")
+                                st.metric(
+                                    "Должно остаться",
+                                    f"{f['theoretical_remaining']:.2f} кг",
+                                )
                             with col4:
                                 st.metric("Дней хранения", f"{f['days_stored']}")
 

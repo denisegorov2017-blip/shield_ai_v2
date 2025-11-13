@@ -3,14 +3,14 @@ import streamlit as st
 
 def main():
     st.title("Database Management")
-    
+
     st.write("This page is designed for database management tasks.")
     st.write("Here you can view tables, execute queries, and manage your database.")
-    
+
     # Add a section for displaying database tables
     st.header("Database Tables")
     st.write("List of available tables will be displayed here.")
-    
+
     # Add a section for executing SQL queries
     st.header("Execute SQL Query")
     query_input = st.text_area("Enter your SQL query here:", height=200)

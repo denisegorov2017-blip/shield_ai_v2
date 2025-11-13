@@ -36,7 +36,7 @@ pylint = "^3.0.0"
 
 [tool.black]
 line-length = 88
-target-version = "py312"
+target-version = ["py312"]
 include = "\\.pyi?$"
 
 [tool.isort]

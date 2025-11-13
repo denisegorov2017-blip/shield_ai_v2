@@ -2,8 +2,8 @@
 Streamlit страница: Парсинг Excel
 """
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 st.header("📁 Парсинг Excel-отчётов из 1C")
 
@@ -23,13 +23,13 @@ if uploaded_file:
     try:
         # Чтение Excel файла
         df = pd.read_excel(uploaded_file)
-        
+
         st.success(f"✅ Файл загружен: {uploaded_file.name}")
-        
+
         # Отображение первых нескольких строк данных
         st.write(f"**Просмотр первых {min(5, len(df))} строк данных:**")
         st.dataframe(df.head())
-        
+
         # Отображение основной информации о файле
         st.write(f"**Размеры файла:** {df.shape[0]} строк x {df.shape[1]} столбцов")
         st.write(f"**Названия столбцов:** {', '.join(df.columns.tolist())}")

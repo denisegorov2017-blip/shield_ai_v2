@@ -64,7 +64,9 @@ class ForecastShrinkageUseCase:
             forecasts.append(
                 {
                     "product_name": batch.product.name if batch.product else "Unknown",
-                    "group_name": batch.product.group_name if batch.product else "Unknown",
+                    "group_name": (
+                        batch.product.group_name if batch.product else "Unknown"
+                    ),
                     "arrival_date": batch.arrival_date,
                     "days_stored": (datetime.now() - batch.arrival_datetime).days,
                     "initial_qty": batch.initial_qty,

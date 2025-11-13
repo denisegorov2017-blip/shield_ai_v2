@@ -18,7 +18,9 @@ class ProductModel(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(
+        String(500), unique=True, nullable=False, index=True
+    )
     group_name: Mapped[str] = mapped_column(String(200), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -46,14 +48,20 @@ class BatchModel(Base):
     __tablename__ = "batches"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False, index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id"), nullable=False, index=True
+    )
     arrival_date: Mapped[str] = mapped_column(String(20), nullable=False)
-    arrival_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    arrival_datetime: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
     initial_qty: Mapped[float] = mapped_column(Float, nullable=False)
     remaining_qty: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Связи
-    product: Mapped["ProductModel"] = relationship("ProductModel", back_populates="batches")
+    product: Mapped["ProductModel"] = relationship(
+        "ProductModel", back_populates="batches"
+    )
     sales: Mapped[List["SaleModel"]] = relationship(
         "SaleModel", back_populates="batch", cascade="all, delete-orphan"
     )
@@ -68,7 +76,9 @@ class SaleModel(Base):
     __tablename__ = "sales"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    batch_id: Mapped[int] = mapped_column(ForeignKey("batches.id"), nullable=False, index=True)
+    batch_id: Mapped[int] = mapped_column(
+        ForeignKey("batches.id"), nullable=False, index=True
+    )
     sale_date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     document_name: Mapped[Optional[str]] = mapped_column(String(500))
@@ -77,7 +87,9 @@ class SaleModel(Base):
     batch: Mapped["BatchModel"] = relationship("BatchModel", back_populates="sales")
 
     def __repr__(self) -> str:
-        return f"<SaleModel(id={self.id}, batch_id={self.batch_id}, qty={self.quantity})>"
+        return (
+            f"<SaleModel(id={self.id}, batch_id={self.batch_id}, qty={self.quantity})>"
+        )
 
 
 class InventoryModel(Base):
@@ -86,14 +98,20 @@ class InventoryModel(Base):
     __tablename__ = "inventories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False, index=True)
-    inventory_date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id"), nullable=False, index=True
+    )
+    inventory_date: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
     expected_qty: Mapped[float] = mapped_column(Float, nullable=False)
     actual_qty: Mapped[float] = mapped_column(Float, nullable=False)
     shrinkage: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Связи
-    product: Mapped["ProductModel"] = relationship("ProductModel", back_populates="inventories")
+    product: Mapped["ProductModel"] = relationship(
+        "ProductModel", back_populates="inventories"
+    )
 
     def __repr__(self) -> str:
         return f"<InventoryModel(id={self.id}, product_id={self.product_id}, date='{self.inventory_date}')>"
@@ -114,7 +132,9 @@ class ShrinkageCoefficientModel(Base):
     calibration_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     # Связи
-    product: Mapped["ProductModel"] = relationship("ProductModel", back_populates="coefficients")
+    product: Mapped["ProductModel"] = relationship(
+        "ProductModel", back_populates="coefficients"
+    )
 
     def __repr__(self) -> str:
         return f"<ShrinkageCoefficientModel(product_id={self.product_id}, a={self.a:.4f}, b={self.b:.4f}, c={self.c:.4f})>"

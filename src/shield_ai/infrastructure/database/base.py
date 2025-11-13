@@ -21,7 +21,9 @@ class Base(DeclarativeBase):
 
 # Engine (синхронный)
 engine = create_engine(
-    DATABASE_URL, echo=False, future=True  # True для отладки SQL  # SQLAlchemy 2.0 стиль
+    DATABASE_URL,
+    echo=False,
+    future=True,  # True для отладки SQL  # SQLAlchemy 2.0 стиль
 )
 
 

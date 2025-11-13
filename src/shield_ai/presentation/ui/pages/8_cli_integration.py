@@ -1,7 +1,8 @@
-import streamlit as st
 import subprocess
 import sys
 from io import StringIO
+
+import streamlit as st
 
 
 def run_cli_command(command: str) -> tuple[str, str]:
@@ -22,7 +23,7 @@ def run_cli_command(command: str) -> tuple[str, str]:
             shell=True,
             capture_output=True,
             text=True,
-            timeout=30  # Таймаут 30 секунд
+            timeout=30,  # Таймаут 30 секунд
         )
         return result.stdout, result.stderr
     except subprocess.TimeoutExpired:
@@ -36,7 +37,11 @@ def main():
     st.write("Выполнение команд командной строки в Streamlit приложении")
 
     # Текстовое поле для ввода команды
-    command = st.text_input("Введите команду CLI:", value="", help="Введите команду для выполнения в терминале")
+    command = st.text_input(
+        "Введите команду CLI:",
+        value="",
+        help="Введите команду для выполнения в терминале",
+    )
 
     # Кнопка для выполнения команды
     if st.button("Выполнить команду"):
