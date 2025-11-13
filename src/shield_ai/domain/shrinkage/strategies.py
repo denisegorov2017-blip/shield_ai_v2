@@ -43,7 +43,6 @@ class ShrinkageStrategy(ABC):
         Returns:
             Усушка в кг
         """
-        pass
 
     @abstractmethod
     def get_name(self) -> str:
@@ -53,7 +52,6 @@ class ShrinkageStrategy(ABC):
         Returns:
             Название стратегии в виде строки
         """
-        pass
 
     @abstractmethod
     def get_accuracy(self) -> str:
@@ -63,7 +61,6 @@ class ShrinkageStrategy(ABC):
         Returns:
             Ожидаемая точность в виде строки (например, "99.9%")
         """
-        pass
 
 
 class PortionStrategy(ShrinkageStrategy):

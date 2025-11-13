@@ -21,7 +21,7 @@ def main():
     }
 
     for component, status in components.items():
-        status_icon = "✅" if status == "Operational" or status == "Normal" else "❌"
+        status_icon = "✅" if status in ("Operational", "Normal") else "❌"
         st.write(f"{status_icon} **{component}**: {status}")
 
     st.subheader("Health Check Logs")

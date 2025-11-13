@@ -5,10 +5,10 @@
 import os
 import sys
 
-from src.shield_ai.application.use_cases.calibrate_coefficients import (
+from shield_ai.application.use_cases.calibrate_coefficients import (
     CalibrateCoefficientsUseCase,
 )
-from src.shield_ai.infrastructure.database.session import get_session
+from shield_ai.infrastructure.database.session import get_session
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 

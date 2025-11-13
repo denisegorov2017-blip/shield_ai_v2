@@ -7,13 +7,13 @@ import random
 import sys
 from datetime import datetime, timedelta
 
-from src.shield_ai.infrastructure.database.models import (
+from shield_ai.infrastructure.database.models import (
     BatchModel,
     InventoryModel,
     ProductModel,
     SaleModel,
 )
-from src.shield_ai.infrastructure.database.session import get_session
+from shield_ai.infrastructure.database.session import get_session
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 

@@ -22,6 +22,7 @@ def run_cli_command(command: str) -> tuple[str, str]:
             capture_output=True,
             text=True,
             timeout=30,  # Таймаут 30 секунд
+            check=True,
         )
         return result.stdout, result.stderr
     except subprocess.TimeoutExpired:

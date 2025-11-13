@@ -13,9 +13,9 @@ ignore-paths =
 # resources (use fnmatch pattern matching).
 ignore-patterns = 
 
-# DEPRECATED: Use ignore-paths instead. Add files or directories matching 
+# DEPRECATED: Use ignore-paths instead. Add files or directories matching
 # these patterns to the list of ignored resources (use fnmatch pattern matching).
-ignore-paths-regex = 
+# ignore-paths-regex =
 
 # Python code to execute, usually for sys.path manipulation.
 init-hook = 
@@ -186,4 +186,4 @@ exclude-protected = _asdict,_fields,_replace,_source,_make
 # Exceptions that will emit a warning when being caught. Defaults to
 # "BaseException, StopIteration, GeneratorExit, KeyboardInterrupt,
 # SystemExit, and Warning".
-overgeneral-exceptions = BaseException,StopIteration,GeneratorExit,KeyboardInterrupt,SystemExit,Warning
+overgeneral-exceptions = builtins.BaseException,builtins.StopIteration,builtins.GeneratorExit,builtins.KeyboardInterrupt,builtins.SystemExit,builtins.Warning

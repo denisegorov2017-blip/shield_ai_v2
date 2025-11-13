@@ -16,8 +16,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ocean_shop.db")
 class Base(DeclarativeBase):
     """Базовый класс для всех ORM моделей"""
 
-    pass
-
 
 # Engine (синхронный)
 engine = create_engine(

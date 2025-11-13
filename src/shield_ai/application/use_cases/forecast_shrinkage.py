@@ -89,5 +89,4 @@ class ForecastShrinkageUseCase:
 
         if coeff:
             return {"a": coeff.a, "b": coeff.b, "c": coeff.c, "status": coeff.status}
-        else:
-            return {"a": 0.05, "b": 0.1, "c": 0.01, "status": "стандартные"}
+        return {"a": 0.05, "b": 0.1, "c": 0.01, "status": "стандартные"}

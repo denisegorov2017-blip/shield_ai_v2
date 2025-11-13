@@ -31,13 +31,13 @@ class ShrinkageProfile:
 
     def __post_init__(self) -> None:
         """Валидация коэффициентов"""
-        if not (0.01 <= self.a <= 0.15):
+        if not 0.01 <= self.a <= 0.15:
             raise ValueError("Коэффициент a должен быть в диапазоне [0.01, 0.15]")
 
-        if not (0.01 <= self.b <= 0.5):
+        if not 0.01 <= self.b <= 0.5:
             raise ValueError("Коэффициент b должен быть в диапазоне [0.01, 0.5]")
 
-        if not (0.0 <= self.c <= 0.03):
+        if not 0.0 <= self.c <= 0.03:
             raise ValueError("Коэффициент c должен быть в диапазоне [0.0, 0.03]")
 
     def is_calibrated(self) -> bool:
@@ -48,5 +48,4 @@ class ShrinkageProfile:
         """Ожидаемая точность в %"""
         if self.is_calibrated():
             return "99.9% (калиброван)"
-        else:
-            return "85-90% (стандартные)"
+        return "85-90% (стандартные)"
