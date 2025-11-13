@@ -82,6 +82,19 @@ if uploaded_file:
                         )
             df = pd.DataFrame(all_products)
 
+            # Отладочный вывод: количество строк, прочитанных из Excel
+            st.info(f"📊 Найдено строк данных: {len(df)}")
+            
+            # Отладочный вывод: информация о том, какие данные искал парсер
+            sections_count = len(result.get("sections", []))
+            products_count = sum(len(section.get("products", [])) for section in result.get("sections", []))
+            batches_count = sum(len(product.get("batches", [])) for section in result.get("sections", []) for product in section.get("products", []))
+            st.info(f"🔍 Парсер искал: {sections_count} групп, {products_count} товаров, {batches_count} партий")
+            
+            # Отладочный вывод: первые 5 строк из загруженного Excel-файла для предварительного просмотра
+            st.write(f"**Предварительный просмотр первых 5 строк:**")
+            st.dataframe(df.head())
+
             st.success(f"✅ Файл загружен: {uploaded_file.name}")
 
             # Отображение первых нескольких строк данных
@@ -92,8 +105,9 @@ if uploaded_file:
             st.write(f"**Размеры файла:** {df.shape[0]} строк x {df.shape[1]} столбцов")
             st.write(f"**Названия столбцов:** {', '.join(df.columns.tolist())}")
 
-            st.subheader("Метаданные парсинга")
-            st.json(result.get("meta", {}))
+            st.subheader("Статистика парсинга")
+            parsing_stats = result.get("meta", {}).get("stats", {})
+            st.json(parsing_stats)
 
             if st.button("🚀 ЗАГРУЗИТЬ И РАСПАРСИТЬ", type="primary"):
                 with st.spinner("Парсинг файла..."):
