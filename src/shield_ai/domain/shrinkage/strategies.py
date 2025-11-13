@@ -169,63 +169,6 @@ class WeightedStrategy(ShrinkageStrategy):
         Returns:
             Общая усушка за период
         """
-        a, b = coeffs["a"], coeffs["b"]
-        M0 = batch_data["initial_mass"]
-        arrival_date = batch_data["arrival_date"]
-        end_date = batch_data["end_date"]
-        daily_sales = batch_data.get("daily_sales", {})
-
-        # Объединяем инициализацию переменных, чтобы уменьшить их количество
-        current_mass, total_shrinkage = M0, 0.0
-        current_date, day_counter = arrival_date, 0
-
-        return total_shrinkage
-
-    def _calculate_daily_values(
-        self,
-        M0: float,
-        current_mass: float,
-        day_counter: int,
-        coeffs: Dict[str, float],
-        daily_sales: Dict[Any, float],
-        current_date: Any,
-    ) -> Tuple[float, float]:
-        """
-        Вспомогательный метод для расчета ежедневной усушки и массы.
-        """
-        a, b = coeffs["a"], coeffs["b"]
-        shrinkage_rate = M0 * a * b * math.exp(-b * day_counter)
-        mass_ratio = current_mass / M0 if M0 > 0 else 0
-        daily_shrinkage = shrinkage_rate * mass_ratio
-
-        total_shrinkage_delta = daily_shrinkage
-        current_mass_delta = -daily_shrinkage
-
-        if current_date in daily_sales:
-            current_mass_delta -= daily_sales[current_date]
-
-        return total_shrinkage_delta, current_mass_delta
-
-    def calculate(self, batch_data: Dict[str, Any], coeffs: Dict[str, float]) -> float:
-        a, b = coeffs["a"], coeffs["b"]
-        M0 = batch_data["initial_mass"]
-        arrival_date = batch_data["arrival_date"]
-        end_date = batch_data["end_date"]
-        daily_sales = batch_data.get("daily_sales", {})
-
-        current_mass, total_shrinkage = M0, 0.0
-        current_date, day_counter = arrival_date, 0
-
-        while current_date <= end_date:
-            daily_shrinkage_amount, mass_change = self._calculate_daily_values(
-                M0, current_mass, day_counter, coeffs, daily_sales, current_date
-            )
-            total_shrinkage += daily_shrinkage_amount
-            current_mass += mass_change
-
-            current_date += timedelta(days=1)
-            day_counter += 1
-
         while current_date <= end_date:
             # Вычисление скорости усушки: M0 * a * b * e^(-b * day_counter)
             # Это производная от функции усушки по времени
