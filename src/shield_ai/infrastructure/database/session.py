@@ -11,7 +11,10 @@ from .base import engine
 
 # Session factory
 SessionLocal = sessionmaker(
-    bind=engine, autocommit=False, autoflush=False, future=True  # SQLAlchemy 2.0 стиль
+    bind=engine,
+    autocommit=False,
+    autoflush=False,
+    future=True,  # SQLAlchemy 2.0 стиль
 )
 
 

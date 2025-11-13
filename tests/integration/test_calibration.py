@@ -2,8 +2,15 @@
 Скрипт для тестирования калибровки коэффициентов
 """
 
-from src.shield_ai.application.use_cases.calibrate_coefficients import CalibrateCoefficientsUseCase
+import os
+import sys
+
+from src.shield_ai.application.use_cases.calibrate_coefficients import (
+    CalibrateCoefficientsUseCase,
+)
 from src.shield_ai.infrastructure.database.session import get_session
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def test_calibration():
@@ -13,7 +20,7 @@ def test_calibration():
         print("Калибровка завершена:", len(results), "товаров")
         for product_name, coeffs in results.items():
             print(
-                f'  {product_name}: a={coeffs["a"]:.4f}, b={coeffs["b"]:.4f}, c={coeffs["c"]:.4f}, статус={coeffs["status"]}'
+                f"  {product_name}: a={coeffs['a']:.4f}, b={coeffs['b']:.4f}, c={coeffs['c']:.4f}, статус={coeffs['status']}"
             )
 
 

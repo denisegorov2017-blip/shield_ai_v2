@@ -2,7 +2,9 @@
 Скрипт для добавления тестовых данных в базу данных
 """
 
+import os
 import random
+import sys
 from datetime import datetime, timedelta
 
 from src.shield_ai.infrastructure.database.models import (
@@ -12,6 +14,8 @@ from src.shield_ai.infrastructure.database.models import (
     SaleModel,
 )
 from src.shield_ai.infrastructure.database.session import get_session
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def add_test_data():

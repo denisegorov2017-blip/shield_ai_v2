@@ -1,6 +1,4 @@
 import subprocess
-import sys
-from io import StringIO
 
 import streamlit as st
 
@@ -20,7 +18,7 @@ def run_cli_command(command: str) -> tuple[str, str]:
         # Запускаем процесс с переданной командой
         result = subprocess.run(
             command,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=30,  # Таймаут 30 секунд

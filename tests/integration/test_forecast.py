@@ -2,8 +2,15 @@
 Скрипт для тестирования прогнозирования усушки
 """
 
-from src.shield_ai.application.use_cases.forecast_shrinkage import ForecastShrinkageUseCase
+import os
+import sys
+
+from src.shield_ai.application.use_cases.forecast_shrinkage import (
+    ForecastShrinkageUseCase,
+)
 from src.shield_ai.infrastructure.database.session import get_session
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def test_forecast():
@@ -13,9 +20,9 @@ def test_forecast():
         print("Прогнозирование завершено:", len(forecasts), "записей")
         for forecast in forecasts:
             print(
-                f'  {forecast["product_name"]}: прогноз усушки = {forecast["predicted_shrinkage"]:.2f} кг, '
-                f'останется = {forecast["theoretical_remaining"]:.2f} кг, '
-                f'дней хранения = {forecast["days_stored"]}'
+                f"  {forecast['product_name']}: прогноз усушки = {forecast['predicted_shrinkage']:.2f} кг, "
+                f"останется = {forecast['theoretical_remaining']:.2f} кг, "
+                f"дней хранения = {forecast['days_stored']}"
             )
 
 
