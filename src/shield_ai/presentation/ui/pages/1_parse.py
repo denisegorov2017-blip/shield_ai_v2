@@ -23,6 +23,9 @@ st.subheader("Excel Upload")
 
 uploaded_file = st.file_uploader("Выбери Excel файл", type=["xlsx", "xls"])
 
+# Загрузка файла-справочника
+groups_file = st.file_uploader("Загрузите файл-справочник групп (необязательно)", type=["xlsx", "xls"])
+
 # Добавляем выбор типа парсера
 parser_type = st.selectbox(
     "Выберите тип парсера",
@@ -50,7 +53,6 @@ if uploaded_file:
                 with st.spinner("Парсинг файла..."):
                     st.info("🛠️ Функционал парсинга будет добавлен в следующем релизе")
         else:  # Парсер остатков (Inventory)
-            parser = InventoryParser()
             # Обрати внимание, что `parse_file` принимает путь, а не файловый объект.
             # Тебе нужно будет временно сохранить uploaded_file, чтобы передать путь.
             # Например, так:
@@ -58,6 +60,15 @@ if uploaded_file:
                 tmp.write(uploaded_file.getbuffer())
                 tmp_path = tmp.name
 
+            # Обработка файла-справочника
+            groups_file_path = None
+            if groups_file:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as groups_tmp:
+                    groups_tmp.write(groups_file.getbuffer())
+                    groups_file_path = groups_tmp.name
+
+            # Теперь выполнить парсинг
+            parser = InventoryParser(groups_file=groups_file_path)
             result = parser.parse_file(tmp_path)
 
             if result.get("error"):
@@ -105,9 +116,19 @@ if uploaded_file:
             st.write(f"**Размеры файла:** {df.shape[0]} строк x {df.shape[1]} столбцов")
             st.write(f"**Названия столбцов:** {', '.join(df.columns.tolist())}")
 
-            st.subheader("Статистика парсинга")
-            parsing_stats = result.get("meta", {}).get("stats", {})
-            st.json(parsing_stats)
+            # Проверяем наличие предупреждений в метаданных
+            if "warnings" in result.get("meta", {}) and result["meta"]["warnings"]:
+                with st.expander("⚠️ Предупреждения парсинга"):
+                    for warning in result["meta"]["warnings"]:
+                        st.warning(warning)
+
+            # Новый блок диагностики
+            with st.expander("📊 Статистика парсинга"):
+                parsing_stats = result.get("meta", {}).get("stats", {})
+                st.json(parsing_stats)
+            
+            with st.expander("🔍 Полный результат (JSON)"):
+                st.json(result)
 
             if st.button("🚀 ЗАГРУЗИТЬ И РАСПАРСИТЬ", type="primary"):
                 with st.spinner("Парсинг файла..."):
