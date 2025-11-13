@@ -2,11 +2,14 @@
 
 ## Общая информация
 
-Shield AI v2.0 включает в себя несколько ключевых компонентов, которые можно протестировать отдельно:
+Shield AI v2.0 включает в себя несколько ключевых компонентов, которые
+можно протестировать отдельно:
 
-1. **Калибровка коэффициентов** - расчет индивидуальных коэффициентов усушки для товаров
+1. **Калибровка коэффициентов** - расчет индивидуальных коэффициентов
+   усушки для товаров
 1. **Прогнозирование усушки** - предсказание потерь для активных партий
-1. **Стратегии усушки** - три различных модели расчета (Порционная, Взвешенная, Совместимости)
+1. **Стратегии усушки** - три различных модели расчета (Порционная,
+   Взвешенная, Совместимости)
 
 ## Подготовка окружения
 
@@ -29,7 +32,8 @@ make init-db
 """
 from datetime import datetime, timedelta
 from src.shield_ai.infrastructure.database.session import get_session
-from src.shield_ai.infrastructure.database.models import ProductModel, BatchModel, SaleModel, InventoryModel
+from src.shield_ai.infrastructure.database.models import ProductModel,
+BatchModel, SaleModel, InventoryModel
 import random
 
 def add_test_data():
@@ -88,7 +92,9 @@ def add_test_data():
             session.add(inventory)
         
         session.commit()
-        print(f"✅ Добавлено: {len(products)} товаров, {len(batches)} партий, {session.query(SaleModel).count()} продаж, {session.query(InventoryModel).count()} инвентаризаций")
+        print(f"✅ Добавлено: {len(products)} товаров, {len(batches)} партий, "
+              f"{session.query(SaleModel).count()} продаж, "
+              f"{session.query(InventoryModel).count()} инвентаризаций")
 
 if __name__ == "__main__":
     add_test_data()
@@ -108,7 +114,8 @@ with get_session() as session:
     results = use_case.execute_all()
     print('Калибровка завершена:', len(results), 'товаров')
     for product_name, coeffs in results.items():
-        print(f'  {product_name}: a={coeffs[\"a\"]:.4f}, b={coeffs[\"b\"]:.4f}, c={coeffs[\"c\"]:.4f}, статус={coeffs[\"status\"]}')
+        print(f'  {product_name}: a={coeffs[\"a\"]:.4f}, b={coeffs[\"b\"]:.4f}, '
+              f'c={coeffs[\"c\"]:.4f}, статус={coeffs[\"status\"]}')
 "
 ```
 
@@ -126,7 +133,8 @@ with get_session() as session:
     forecasts = use_case.execute_all()
     print('Прогнозирование завершено:', len(forecasts), 'записей')
     for forecast in forecasts:
-        print(f'  {forecast[\"product_name\"]}: прогноз усушки = {forecast[\"predicted_shrinkage\"]:.2f} кг, '
+        print(f'  {forecast[\"product_name\"]}: прогноз усушки = '
+              f'{forecast[\"predicted_shrinkage\"]:.2f} кг, '
               f'останется = {forecast[\"theoretical_remaining\"]:.2f} кг, '
               f'дней хранения = {forecast[\"days_stored\"]}')
 "
@@ -141,7 +149,8 @@ with get_session() as session:
    - Каждая продажа рассматривается как отдельная порция
    - Формула: `Усушка_порции = m * [a * (1 - e^(-b*t)) + c]`
 
-1. **ВЗВЕШЕННАЯ ИНТЕГРАЛЬНАЯ МОДЕЛЬ** (99.5% точность) - используется для production прогнозов
+1. **ВЗВЕШЕННАЯ ИНТЕГРАЛЬНАЯ МОДЕЛЬ** (99.5% точность) - используется для
+   production прогнозов
 
    - Усушка рассчитывается дискретно по дням с учётом остатка
    - Подходит для реальных расчетов
@@ -185,7 +194,8 @@ def test_calibration():
         results = use_case.execute_all()
         print('Калибровка завершена:', len(results), 'товаров')
         for product_name, coeffs in results.items():
-            print(f'  {product_name}: a={coeffs["a"]:.4f}, b={coeffs["b"]:.4f}, c={coeffs["c"]:.4f}, статус={coeffs["status"]}')
+            print(f'  {product_name}: a={coeffs["a"]:.4f}, b={coeffs["b"]:.4f}, '
+                  f'c={coeffs["c"]:.4f}, статус={coeffs["status"]}')
 
 if __name__ == "__main__":
     test_calibration()
@@ -206,7 +216,8 @@ def test_forecast():
         forecasts = use_case.execute_all()
         print('Прогнозирование завершено:', len(forecasts), 'записей')
         for forecast in forecasts:
-            print(f'  {forecast["product_name"]}: прогноз усушки = {forecast["predicted_shrinkage"]:.2f} кг, '
+            print(f'  {forecast["product_name"]}: прогноз усушки = '
+                  f'{forecast["predicted_shrinkage"]:.2f} кг, '
                   f'останется = {forecast["theoretical_remaining"]:.2f} кг, '
                   f'дней хранения = {forecast["days_stored"]}')
 

@@ -2,7 +2,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-# description: Execute the implementation planning workflow using the plan template to generate design artifacts.
+# description: Execute the implementation planning workflow using the plan template to generate design artifacts
 
 ## User Input
 

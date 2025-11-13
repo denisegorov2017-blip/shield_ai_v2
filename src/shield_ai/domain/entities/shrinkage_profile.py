@@ -16,6 +16,7 @@ class CoefficientStatus(Enum):
     ESTIMATED = "оценочные"
 
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class ShrinkageProfile:
     """Профиль усушки для товара"""

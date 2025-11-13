@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Shield AI"
-copyright = "2025, Shield AI Team"
+copyright_holder = "2025, Shield AI Team"
 author = "Shield AI Team"
 release = "2.0.0"
 
