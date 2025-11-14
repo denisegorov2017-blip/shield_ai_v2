@@ -24,7 +24,9 @@ st.subheader("Excel Upload")
 uploaded_file = st.file_uploader("Выбери Excel файл", type=["xlsx", "xls"])
 
 # Загрузка файла-справочника
-groups_file = st.file_uploader("Загрузите файл-справочник групп (необязательно)", type=["xlsx", "xls"])
+groups_file = st.file_uploader(
+    "Загрузите файл-справочник групп (необязательно)", type=["xlsx", "xls"]
+)
 
 # Добавляем выбор типа парсера
 parser_type = st.selectbox(
@@ -63,7 +65,9 @@ if uploaded_file:
             # Обработка файла-справочника
             groups_file_path = None
             if groups_file:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as groups_tmp:
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".xlsx"
+                ) as groups_tmp:
                     groups_tmp.write(groups_file.getbuffer())
                     groups_file_path = groups_tmp.name
 
@@ -95,11 +99,18 @@ if uploaded_file:
 
             # Отладочный вывод: количество строк, прочитанных из Excel
             st.info(f"📊 Найдено строк данных: {len(df)}")
-            
+
             # Отладочный вывод: информация о том, какие данные искал парсер
             sections_count = len(result.get("sections", []))
-            products_count = sum(len(section.get("products", [])) for section in result.get("sections", []))
-            batches_count = sum(len(product.get("batches", [])) for section in result.get("sections", []) for product in section.get("products", []))
+            products_count = sum(
+                len(section.get("products", []))
+                for section in result.get("sections", [])
+            )
+            batches_count = sum(
+                len(product.get("batches", []))
+                for section in result.get("sections", [])
+                for product in section.get("products", [])
+            )
             stats = result.get("meta", {}).get("stats", {})
             total_docs = stats.get("total_docs", 0)
             batch_movements = stats.get("batch_movements", 0)
@@ -107,9 +118,9 @@ if uploaded_file:
                 f"🔍 Парсер нашел: {sections_count} групп, {products_count} товаров, {batches_count} партий, "
                 f"{total_docs} документов, {batch_movements} движений партий."
             )
-            
+
             # Отладочный вывод: первые 5 строк из загруженного Excel-файла для предварительного просмотра
-            st.write(f"**Предварительный просмотр первых 5 строк:**")
+            st.write("**Предварительный просмотр первых 5 строк:**")
             st.dataframe(df.head())
 
             st.success(f"✅ Файл загружен: {uploaded_file.name}")
@@ -132,7 +143,7 @@ if uploaded_file:
             with st.expander("📊 Статистика парсинга"):
                 parsing_stats = result.get("meta", {}).get("stats", {})
                 st.json(parsing_stats)
-            
+
             with st.expander("🔍 Полный результат (JSON)"):
                 st.json(result)
 

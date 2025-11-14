@@ -1,6 +1,6 @@
 # Makefile for Shield AI v2.0
 
-.PHONY: help install run test test-cov lint format mypy pyright pylint pre-commit bandit safety dependency-check ci complexity-check docs-build
+.PHONY: help install run test test-cov lint format mypy pyright pylint pre-commit bandit safety dependency-check ci complexity-check docs-build typecheck security coverage complexity all
 
 help:
 	@echo "🛡️ Shield AI - Команды разработки"
@@ -8,11 +8,12 @@ help:
 	@echo "make install    - Установка зависимостей"
 	@echo "make run        - Запуск Streamlit UI"
 	@echo "make init-db    - Инициализация БД"
-	@echo "make test       - Запуск тестов"
+	@echo "make test       - Запуск тестов (pytest)"
 	@echo "make test-cov   - Запуск тестов с отчетом о покрытии"
 	@echo "make lint       - Линтинг (ruff)"
 	@echo "make pylint     - Проверка стиля кода (pylint)"
 	@echo "make format     - Форматирование (black+isort)"
+	@echo "make typecheck  - Проверка типов (mypy + опционально pyright)"
 	@echo "make mypy       - Проверка типов (mypy)"
 	@echo "make pyright    - Проверка типов (pyright)"
 	@echo "make pre-commit - Запуск pre-commit хуков"
@@ -22,6 +23,10 @@ help:
 	@echo "make docs-build - Генерация документации (Sphinx)"
 	@echo "make ci         - Полный CI пайплайн"
 	@echo "make complexity-check - Анализ сложности кода (radon)"
+	@echo "make security   - Проверка безопасности (bandit + pip-audit)"
+	@echo "make coverage   - Отчет покрытия тестами (проверка >= 80%)"
+	@echo "make complexity - Метрики сложности кода (radon)"
+	@echo "make all        - Полная проверка перед коммитом (все команды + pre-commit hooks)"
 
 install:
 	poetry install
@@ -29,6 +34,23 @@ install:
 run:
 	bash ./scripts/link_pages.sh
 	poetry run streamlit run main.py
+
+typecheck:
+	poetry run mypy src/
+	poetry run pyright
+
+security:
+	poetry run bandit -r src/
+	poetry run pip-audit
+
+coverage:
+	poetry run pytest tests/ -v --cov=src/shield_ai --cov-report=html --cov-report=xml --cov-report=term --cov-fail-under=80 -n auto
+
+complexity:
+	poetry run radon cc src/shield_ai -s -a -n 10 && poetry run radon mi src/shield_ai -s
+
+all: format lint typecheck security complexity test-cov docs-build
+	@echo "✅ Все проверки пройдены!"
 
 init-db:
 	poetry run python -c "from shield_ai.infrastructure.database import init_db; init_db()"
