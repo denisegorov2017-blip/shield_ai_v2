@@ -360,7 +360,8 @@ class InventoryParser:
                product['external_batches_created'] = 0
            product['external_batches_created'] += 1
            
-           self.logger.info(f"Создана внешняя партия '{batch_code}' для товара '{product['name']}' по документу '{doc_name}'")
+           self.logger.info(f"Создана внешняя партия '{batch_code}' для товара '{product['name']}' по документу '{doc_name}'. "
+                          f"Количество: {remaining_out:.4f}, дата: {arrival_datetime.strftime('%d.%m.%Y %H:%M:%S')}")
            
            # Устанавливаем remaining_out в 0, так как все списано
            remaining_out = 0.0
@@ -741,6 +742,26 @@ class InventoryParser:
         
         self.logger.info("Парсинг завершён успешно!")
         
+        # Подсчитываем количество созданных внешних партий и собираем информацию о них
+        external_batches_created = 0
+        external_batches_info = []
+        
+        for section in sections:
+            for product in section['products']:
+                if 'external_batches_created' in product:
+                    external_batches_created += product['external_batches_created']
+                
+                # Собираем информацию о внешних партиях
+                for batch in product['batches']:
+                    if batch.get('external', False):
+                        external_batches_info.append({
+                            'product_name': product['name'],
+                            'batch_code': batch['batch_code'],
+                            'quantity': batch['qty']['begin'],
+                            'arrival_date': batch['arrival_date'],
+                            'document_name': batch['documents'][0]['name'] if batch['documents'] else 'N/A'
+                        })
+        
         return {
             'meta': {
                 'title': 'Ведомость по партиям номенклатуры',
@@ -755,6 +776,8 @@ class InventoryParser:
                 'stats': stats,
                 'parsed_at': datetime.now().isoformat(),
                 'warnings': warnings,
+                'external_batches_created': external_batches_created > 0,  # Флаг наличия внешних партий
+                'external_batches_info': external_batches_info  # Информация о внешних партиях
             },
             'warehouse': context['warehouse'],
             'sections': sections,
@@ -800,6 +823,19 @@ class InventoryParser:
         md_lines.append(f"# {data['meta']['title']} (v{data['meta']['version']})")
         md_lines.append(f"\n**Дата парсинга**: {data['meta']['parsed_at']}")
         md_lines.append(f"**Склад**: {data.get('warehouse', 'Не указан')}\n")
+        
+        # Добавляем уведомление о внешних партиях
+        if data['meta'].get('external_batches_created', False):
+            md_lines.append(f"**ВНИМАНИЕ**: Обнаружены внешние партии (созданы автоматически при нехватке товара по FIFO)")
+            external_info = data['meta'].get('external_batches_info', [])
+            if external_info:
+                md_lines.append("\n### Внешние партии:")
+                md_lines.append("| Товар | Код партии | Количество | Дата поступления | Документ |")
+                md_lines.append("|---|---|---|---|")
+                for ext_batch in external_info:
+                    md_lines.append(f"| {ext_batch['product_name']} | **{ext_batch['batch_code']}** | {ext_batch['quantity']:.4f} | {ext_batch['arrival_date']} | {ext_batch['document_name']} |")
+            md_lines.append("\n")
+        
         md_lines.append("---")
         
         md_lines.append("\n## Статистика\n")
@@ -814,7 +850,17 @@ class InventoryParser:
             
             for product in section['products']:
                 qty = product['qty_summary']
-                md_lines.append(f"| {product['name']} | {qty['begin']:.4f} | {qty['in']:.4f} | {qty['out']:.4f} | {qty['end']:.4f} | {len(product['batches'])} |")
+                # Проверяем, есть ли внешние партии у этого продукта
+                has_external = any(batch.get('external', False) for batch in product['batches'])
+                product_name = f"**{product['name']}**" if has_external else product['name']
+                md_lines.append(f"| {product_name} | {qty['begin']:.4f} | {qty['in']:.4f} | {qty['out']:.4f} | {qty['end']:.4f} | {len(product['batches'])} |")
+                
+                # Добавляем информацию о внешних партиях для этого продукта
+                if has_external:
+                    md_lines.append("| | | | |")
+                    for batch in product['batches']:
+                        if batch.get('external', False):
+                            md_lines.append(f"| *Внешняя партия: {batch['batch_code']}* | | | | | |")
             
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
