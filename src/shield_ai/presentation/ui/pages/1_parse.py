@@ -100,7 +100,13 @@ if uploaded_file:
             sections_count = len(result.get("sections", []))
             products_count = sum(len(section.get("products", [])) for section in result.get("sections", []))
             batches_count = sum(len(product.get("batches", [])) for section in result.get("sections", []) for product in section.get("products", []))
-            st.info(f"🔍 Парсер искал: {sections_count} групп, {products_count} товаров, {batches_count} партий")
+            stats = result.get("meta", {}).get("stats", {})
+            total_docs = stats.get("total_docs", 0)
+            batch_movements = stats.get("batch_movements", 0)
+            st.info(
+                f"🔍 Парсер нашел: {sections_count} групп, {products_count} товаров, {batches_count} партий, "
+                f"{total_docs} документов, {batch_movements} движений партий."
+            )
             
             # Отладочный вывод: первые 5 строк из загруженного Excel-файла для предварительного просмотра
             st.write(f"**Предварительный просмотр первых 5 строк:**")

@@ -228,78 +228,144 @@ class InventoryParser:
         except (ValueError, TypeError):
             return 0.0
 
-    def _apply_fifo_expense(self, product: Dict, total_out: float, doc_name: str, warnings: list = None):
-        """
-        Применяет списание по FIFO к партиям товара.
+   def _apply_fifo_expense(self, product: Dict, total_out: float, doc_name: str, warnings: list = None):
+       """
+       Применяет списание по FIFO к партиям товара.
 
-        Args:
-            product (Dict): Словарь товара с партиями.
-            total_out (float): Общее количество для списания.
-            doc_name (str): Название документа расхода.
-            warnings (list): Список для сбора предупреждений.
-        """
-        if warnings is None:
-            warnings = []
-            
-        remaining_out = total_out
-        
-        self.logger.debug(f"[FIFO-РАСХОД] Списание {total_out:.4f} ед. товара '{product['name']}' по документу '{doc_name}'")
-        self.logger.debug(f"Партий до списания: {len(product['batches'])}")
+       Args:
+           product (Dict): Словарь товара с партиями.
+           total_out (float): Общее количество для списания.
+           doc_name (str): Название документа расхода.
+           warnings (list): Список для сбора предупреждений.
+       """
+       if warnings is None:
+           warnings = []
+           
+       remaining_out = total_out
+       
+       self.logger.debug(f"[FIFO-РАСХОД] Списание {total_out:.4f} ед. товара '{product['name']}' по документу '{doc_name}'")
+       self.logger.debug(f"Партий до списания: {len(product['batches'])}")
 
-        # Сортируем партии по дате и времени поступления для FIFO (от старых к новым)
-        sorted_batches = sorted(product['batches'], key=lambda x: x['arrival_datetime'])
+       # Сортируем партии по дате и времени поступления для FIFO (от старых к новым)
+       sorted_batches = sorted(product['batches'], key=lambda x: x['arrival_datetime'])
 
-        for i, batch in enumerate(sorted_batches):
-            if remaining_out <= 1e-9: # Используем допуск для float
-                self.logger.debug("Списание полностью выполнено.")
-                break
-            
-            available_qty = batch['qty']['end']
-            
-            self.logger.debug(f"Проверка партии {i+1} ({batch['arrival_date']}): доступно {available_qty:.4f}")
+       for i, batch in enumerate(sorted_batches):
+           if remaining_out <= 1e-9: # Используем допуск для float
+               self.logger.debug("Списание полностью выполнено.")
+               break
+           
+           available_qty = batch['qty']['end']
+           
+           self.logger.debug(f"Проверка партии {i+1} ({batch['arrival_date']}): доступно {available_qty:.4f}")
 
-            if available_qty <= 1e-9:
-                self.logger.debug("Партия пустая, пропускаем.")
-                continue
-            
-            current_batch_out = min(remaining_out, available_qty)
-            
-            self.logger.debug(f"Списываем {current_batch_out:.4f} из этой партии.")
+           if available_qty <= 1e-9:
+               self.logger.debug("Партия пустая, пропускаем.")
+               continue
+           
+           current_batch_out = min(remaining_out, available_qty)
+           
+           self.logger.debug(f"Списываем {current_batch_out:.4f} из этой партии.")
 
-            batch['qty']['out'] += current_batch_out
-            batch['qty']['end'] -= current_batch_out
+           batch['qty']['out'] += current_batch_out
+           batch['qty']['end'] -= current_batch_out
 
-            if batch['qty']['end'] < -1e-9:
-                deficit = abs(batch['qty']['end'])
-                warning_msg = f"Отрицательный баланс после FIFO списания: товар {product['name']}, партия {batch['arrival_date']}, документ {doc_name}, дефицит {deficit:.4f}"
-                self.logger.warning(warning_msg)
-                warnings.append(warning_msg)
-                batch['qty']['end'] = 0.0
-            
-            validation = self._validate_balance(batch['qty']['begin'], batch['qty']['in'], batch['qty']['out'], batch['qty']['end'])
-            batch['validation'] = validation
-            
-            if not validation['valid']:
-                error_msg = f"Партия {batch['arrival_date']} товара {product['name']}: {validation['error']}"
-                self.logger.error(error_msg)
-            
-            batch['documents'].append({
-                'type': 'document',
-                'doc_type': 'expense',
-                'name': doc_name,
-                'qty': {'in': 0.0, 'out': current_batch_out}
-            })
-            
-            self.logger.info(f"[FIFO EXPENSE] {doc_name} списал {current_batch_out:.4f} из партии {batch['arrival_date']}, остаток: {batch['qty']['end']:.4f}")
-            remaining_out -= current_batch_out
-            self.logger.debug(f"Остаток для списания: {remaining_out:.4f}")
+           if batch['qty']['end'] < -1e-9:
+               deficit = abs(batch['qty']['end'])
+               warning_msg = f"Отрицательный баланс после FIFO списания: товар {product['name']}, партия {batch['arrival_date']}, документ {doc_name}, дефицит {deficit:.4f}"
+               self.logger.warning(warning_msg)
+               warnings.append(warning_msg)
+               batch['qty']['end'] = 0.0
+           
+           validation = self._validate_balance(batch['qty']['begin'], batch['qty']['in'], batch['qty']['out'], batch['qty']['end'])
+           batch['validation'] = validation
+           
+           if not validation['valid']:
+               error_msg = f"Партия {batch['arrival_date']} товара {product['name']}: {validation['error']}"
+               self.logger.error(error_msg)
+           
+           batch['documents'].append({
+               'type': 'document',
+               'doc_type': 'expense',
+               'name': doc_name,
+               'qty': {'in': 0.0, 'out': current_batch_out}
+           })
+           
+           self.logger.info(f"[FIFO EXPENSE] {doc_name} списал {current_batch_out:.4f} из партии {batch['arrival_date']}, остаток: {batch['qty']['end']:.4f}")
+           remaining_out -= current_batch_out
+           self.logger.debug(f"Остаток для списания: {remaining_out:.4f}")
 
-        if remaining_out > 1e-9:
-            error_msg = f"Недостаточно товара '{product['name']}' для полного списания по документу '{doc_name}'. Не хватает: {remaining_out:.4f}"
-            self.logger.error(error_msg)
-            warnings.append(error_msg)
-        
-        self.logger.debug(f"[FIFO-РАСХОД] Завершено. Осталось несписанного: {remaining_out:.4f}")
+       # Если после прохода по существующим партиям осталось несписанное количество
+       if remaining_out > 1e-9:
+           # Создаем новую "внешнюю" партию
+           self.logger.info(f"Создание внешней партии для товара '{product['name']}' по документу '{doc_name}'. Не хватает: {remaining_out:.4f}")
+           
+           # Пытаемся извлечь дату из имени документа
+           arrival_datetime = None
+           # Ищем дату в формате ДД.ММ.ГГГГ или ДД.ММ.ГГГ ЧЧ:ММ:СС
+           date_match = re.search(r'(\d{2}\.\d{2}\.\d{4}(?:\s+\d{2}:\d{2}:\d{2})?)', doc_name)
+           if date_match:
+               date_str = date_match.group(1)
+               try:
+                   if len(date_str) == 10:  # Только дата
+                       arrival_datetime = datetime.strptime(date_str, '%d.%m.%Y')
+                   else:  # Дата и время
+                       arrival_datetime = datetime.strptime(date_str, '%d.%m.%Y %H:%M:%S')
+               except ValueError:
+                   self.logger.warning(f"Не удалось распознать дату в документе '{doc_name}', используем текущее время")
+                   arrival_datetime = datetime.now()
+           else:
+               self.logger.warning(f"Не удалось извлечь дату из документа '{doc_name}', используем текущее время")
+               arrival_datetime = datetime.now()
+           
+           # Формируем batch_code с префиксом "external-"
+           batch_code = f"external-{arrival_datetime.strftime('%d.%m.%Y %H:%M:%S')}"
+           
+           # Создаем новую внешнюю партию
+           external_batch = {
+               'type': 'batch',
+               'arrival_date': arrival_datetime.strftime('%d.%m.%Y'),
+               'arrival_time': arrival_datetime.strftime('%H:%M:%S'),
+               'arrival_datetime': arrival_datetime,
+               'batch_code': batch_code,
+               'external': True,  # Отметка, что это внешняя партия
+               'qty': {
+                   'begin': remaining_out,
+                   'in': 0.0,
+                   'out': remaining_out,
+                   'end': 0.0
+               },
+               'qty_raw': {
+                   'begin': remaining_out,
+                   'in': 0.0,
+                   'out': remaining_out,
+                   'end': 0.0
+               },
+               'documents': [
+                   {
+                       'type': 'document',
+                       'doc_type': 'external',
+                       'name': doc_name,
+                       'note': 'Партия создана автоматически. Поступление вне периода отчёта.',
+                       'qty': {'in': 0.0, 'out': remaining_out}
+                   }
+               ],
+               'validation': {'valid': True, 'diff': 0.0, 'error': None}
+           }
+           
+           # Добавляем внешнюю партию в товар
+           product['batches'].append(external_batch)
+           
+           # Обновляем статистику
+           if 'external_batches_created' not in product:
+               product['external_batches_created'] = 0
+           product['external_batches_created'] += 1
+           
+           self.logger.info(f"Создана внешняя партия '{batch_code}' для товара '{product['name']}' по документу '{doc_name}'")
+           
+           # Устанавливаем remaining_out в 0, так как все списано
+           remaining_out = 0.0
+
+       self.logger.debug(f"[FIFO-РАСХОД] Завершено. Осталось несписанного: {remaining_out:.4f}")
 
     def _find_header_indices(self, header_row: list) -> Dict:
         """Находит индексы колонок по их заголовкам."""
@@ -464,6 +530,7 @@ class InventoryParser:
         if doc_in_qty > 0 and ('Пересортица' in name_str or 'Оприходование излишков' in name_str):
             is_special_case = True
             stats['receipt_docs'] += 1
+            stats['total_docs'] += 1
             if 'Пересортица' in name_str: stats['peresortitsa_docs'] += 1
             
             self.logger.debug(f"[КОРРЕКТИРОВКА-ПРИХОД] '{name_str}', кол-во: {doc_in_qty}")
@@ -473,6 +540,15 @@ class InventoryParser:
                 latest_batch = max(current_product['batches'], key=lambda b: b['arrival_datetime'])
                 latest_batch['qty']['in'] += doc_in_qty
                 latest_batch['qty']['end'] += doc_in_qty
+                
+                # Добавляем документ в партию
+                latest_batch['documents'].append({
+                    'type': 'document',
+                    'doc_type': 'receipt',
+                    'name': name_str,
+                    'qty': {'in': doc_in_qty, 'out': 0.0}
+                })
+                stats['batch_movements'] += 1
                 
                 self.logger.info(f"[CORRECTION RECEIPT] '{name_str}' добавил {doc_in_qty} к партии {latest_batch['arrival_date']}")
             else:
@@ -487,6 +563,7 @@ class InventoryParser:
         if doc_type == 'expense':
             is_special_case = True
             stats['expense_docs'] += 1
+            stats['total_docs'] += 1
             if 'Пересортица' in name_str and doc_in_qty == 0: stats['peresortitsa_docs'] += 1
 
             if doc_out_qty > 0:
@@ -508,6 +585,8 @@ class InventoryParser:
                 'qty': {'in': doc_in_qty, 'out': doc_out_qty}
             }
             current_batch['documents'].append(document)
+            stats['total_docs'] += 1
+            stats['batch_movements'] += 1
             # В v2.1 мы не меняем qty партии здесь, т.к. они уже прочитаны из строки партии.
             # Изменение происходит только при FIFO и корректировках.
 
@@ -608,7 +687,8 @@ class InventoryParser:
             'warehouses': 0, 'groups': 0, 'products': 0, 'batches': 0,
             'receipt_docs': 0, 'expense_docs': 0, 'peresortitsa_docs': 0,
             'movement_docs': 0, 'return_docs': 0, 'surplus_docs': 0,
-            'valid_batches': 0, 'invalid_batches': 0
+            'valid_batches': 0, 'invalid_batches': 0,
+            'total_docs': 0, 'batch_movements': 0
         }
         
         # Инициализация списка предупреждений
