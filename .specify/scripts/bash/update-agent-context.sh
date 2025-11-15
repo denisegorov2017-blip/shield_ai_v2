@@ -34,7 +34,8 @@
 #    - Поддерживает: Claude, Gemini, Copilot, Cursor, Qwen, opencode, Codex, Windsurf, Kilo Code, Auggie CLI, Roo Code, CodeBuddy CLI, Amp или Amazon Q Developer CLI
 #    - Может обновлять одного агента или все существующие файлы агента
 #    - Создает файл Claude по умолчанию, если файлы агента не существуют
-#
+# 
+# Использование: ./update-agent-context.sh [kilocode]
 # Использование: ./update-agent-context.sh [agent_type]
 # Типы агентов: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|q
 # Оставьте пустым для обновления всех существующих файлов агента
