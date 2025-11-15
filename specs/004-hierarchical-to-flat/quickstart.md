@@ -19,7 +19,7 @@ from typing import List
 from decimal import Decimal
 from datetime import datetime
 # Предполагается, что модель находится в contracts.flat_record
-from specs.hierarchical_to_flat.contracts.flat_record import FlatRecord
+from src.shield_ai.infrastructure.parsers.dto import FlatRecord
 
 def parse_inventory_report(file_path: str) -> List[FlatRecord]:
     # Это заглушка для реальной реализации парсера.

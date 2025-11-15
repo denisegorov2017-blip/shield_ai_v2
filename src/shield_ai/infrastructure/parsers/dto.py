@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum, auto
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RowType(Enum):
@@ -24,20 +24,20 @@ class FlatRecord(BaseModel):
     Содержит все поля, указанные в спецификации data-model.md,
     с правильными типами данных для корректной валидации и обработки.
     """
-    warehouse: str
-    group: str
-    product: str
-    batch_code: str
-    batch_date: datetime
-    doc_type: str
-    doc_date: datetime
-    qty_begin: Decimal
-    qty_in: Decimal
-    qty_out: Decimal
-    qty_end: Decimal
-    unit: str
-    comment: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    warehouse: str = Field(..., description="Склад, на котором произошла транзакция.")
+    group: str = Field(..., description="Товарная группа.")
+    product: str = Field(..., description="Наименование конкретного товара.")
+    batch_code: str = Field(..., description="Уникальный идентификатор партии. Создается только приходным документом.")
+    batch_date: datetime = Field(..., description="Дата прихода партии. Важно для FIFO и отслеживания срока годности.")
+    doc_type: str = Field(..., description="Тип документа движения (например, 'Поступление', 'Реализация').")
+    doc_date: datetime = Field(..., description="Дата документа движения. Должна быть с таймзоной для избежания несостыковок.")
+    qty_begin: Decimal = Field(..., description="Начальное количество до транзакции.")
+    qty_in: Decimal = Field(..., description="Количество поступления.")
+    qty_out: Decimal = Field(..., description="Количество расхода.")
+    qty_end: Decimal = Field(..., description="Конечное количество после транзакции.")
+    unit: str = Field(..., description="Единица измерения (например, 'кг', 'шт').")
+    comment: Optional[str] = Field(None, description="Необязательный комментарий к записи.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Служебные метаданные для будущего расширения.")
 
 
 class ParsingContext(BaseModel):

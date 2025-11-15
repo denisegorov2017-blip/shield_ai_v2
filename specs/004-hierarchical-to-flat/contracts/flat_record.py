@@ -19,7 +19,7 @@ class FlatRecord(BaseModel):
     batch_code: str = Field(..., description="Уникальный идентификатор партии. Создается только приходным документом.")
     batch_date: datetime = Field(..., description="Дата прихода партии. Важно для FIFO и отслеживания срока годности.")
     doc_type: str = Field(..., description="Тип документа движения (например, 'Поступление', 'Реализация').")
-    doc_date: datetime = Field(..., description="Дата документа движения. Рекомендуется хранить с таймзоной.")
+    doc_date: datetime = Field(..., description="Дата документа движения. Должна быть с таймзоной для избежания несостыковок.")
     qty_begin: Decimal = Field(..., description="Начальное количество до транзакции.")
     qty_in: Decimal = Field(..., description="Количество поступления.")
     qty_out: Decimal = Field(..., description="Количество расхода.")
