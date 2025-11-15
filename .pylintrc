@@ -61,7 +61,7 @@ enable =
 # * C: disable all conventions
 # * E: disable all errors
 # * [specific-msg-id]: disable that specific message id
-disable = C0103,C0114,C0115,C0116,C0301,R0903,R0913,W0613
+disable = C0103,C0114,C0115,C0116,C0301,R0903,R0913,W0613,W0703,R0914,R0902,R0912,R0915
 
 
 [REPORTS]

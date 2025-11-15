@@ -3,13 +3,29 @@ ORM модели SQLAlchemy 2.0 с современной типизацией (
 Синхронная работа
 """
 
-from datetime import datetime
-from typing import List, Optional
+from datetime import (
+    datetime,
+)
+from typing import (
+    List,
+    Optional,
+)
 
-from sqlalchemy import DateTime, Float, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+)
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
-from .base import Base
+from .base import (
+    Base,
+)
 
 
 class ProductModel(Base):
@@ -138,3 +154,62 @@ class ShrinkageCoefficientModel(Base):
 
     def __repr__(self) -> str:
         return f"<ShrinkageCoefficientModel(product_id={self.product_id}, a={self.a:.4f}, b={self.b:.4f}, c={self.c:.4f})>"
+
+
+class BatchMovementModel(Base):
+    """Движение товара по партии"""
+
+    __tablename__ = "batch_movements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nomenclature: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    movement_date: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
+    movement_type: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )  # 'приход', 'расход', 'корректировка'
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    warehouse: Mapped[str] = mapped_column(String(200), nullable=False)
+    batch_number: Mapped[Optional[str]] = mapped_column(String(200), index=True)
+    document_name: Mapped[Optional[str]] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def __repr__(self) -> str:
+        return f"<BatchMovementModel(id={self.id}, nomenclature='{self.nomenclature}', movement_date='{self.movement_date}', type='{self.movement_type}', qty={self.quantity})>"
+
+
+class BatchBalanceModel(Base):
+    """Остаток товара по партии"""
+
+    __tablename__ = "batch_balances"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nomenclature: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    balance: Mapped[float] = mapped_column(Float, nullable=False)
+    warehouse: Mapped[str] = mapped_column(String(200), nullable=False)
+    batch: Mapped[Optional[str]] = mapped_column(String(200), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def __repr__(self) -> str:
+        return f"<BatchBalanceModel(id={self.id}, nomenclature='{self.nomenclature}', date='{self.date}', balance={self.balance})>"
+
+
+class ShrinkageCalculationModel(Base):
+    """Результат расчёта усушки"""
+
+    __tablename__ = "shrinkage_calculations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nomenclature: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
+    calculated_shrinkage: Mapped[float] = mapped_column(Float, nullable=False)
+    actual_balance: Mapped[float] = mapped_column(Float, nullable=False)
+    deviation: Mapped[float] = mapped_column(Float, nullable=False)
+    calculation_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    period_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    period_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    def __repr__(self) -> str:
+        return f"<ShrinkageCalculationModel(id={self.id}, nomenclature='{self.nomenclature}', calculated_shrinkage={self.calculated_shrinkage}, actual_balance={self.actual_balance}, deviation={self.deviation})>"

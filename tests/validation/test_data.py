@@ -5,21 +5,44 @@
 import os
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import (
+    datetime,
+    timedelta,
+)
 
+# Добавляем корневую директорию проекта в sys.path для корректных импортов
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+)
+
+# Импорты после изменения sys.path
 from shield_ai.infrastructure.database.models import (
     BatchModel,
     InventoryModel,
     ProductModel,
     SaleModel,
 )
-from shield_ai.infrastructure.database.session import get_session
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+from shield_ai.infrastructure.database.session import (
+    get_session,
+)
 
 
 def add_test_data():
     with get_session() as session:
+        # Проверяем, существуют ли уже тестовые товары
+        existing_products = (
+            session.query(ProductModel)
+            .filter(ProductModel.name.like("Тестовый товар %"))
+            .all()
+        )
+
+        if existing_products:
+            # Если тестовые данные уже существуют, удаляем их
+            for product in existing_products:
+                session.delete(product)
+            session.commit()
+            print("🗑️ Удалены существующие тестовые товары")
+
         # Создаем тестовые товары
         products = []
         for i in range(1, 4):

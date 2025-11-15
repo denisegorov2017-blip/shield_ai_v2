@@ -7,6 +7,11 @@
 
    ARCHITECTURE
    Modeli_usushki
+   CLI_INTERFACE
+   STREAMLIT_UI
+   USE_CASES
+   EXPORTERS
+   INVENTORY_PARSER
    RUNNING_TESTS
 
 Indices and tables

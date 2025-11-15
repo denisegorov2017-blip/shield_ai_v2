@@ -1,0 +1,4 @@
+src/shield_ai/presentation/ui/pages/5_shrinkage_analysis.py:122: error: Incompatible types in assignment (expression has type "ForecastShrinkageUseCase", variable has type "CalibrateCoefficientsUseCase")  [assignment]
+src/shield_ai/presentation/ui/pages/5_shrinkage_analysis.py:126: error: Generator has incompatible item type "str"; expected "bool"  [misc]
+src/shield_ai/presentation/ui/pages/5_shrinkage_analysis.py:126: error: Invalid index type "str" for "str"; expected type "SupportsIndex | slice[Any, Any, Any]"  [index]
+Found 3 errors in 1 file (checked 38 source files)

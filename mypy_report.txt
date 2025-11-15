@@ -1,0 +1,10 @@
+src/shield_ai/application/use_cases/calibrate_coefficients.py:16: error: Library stubs not installed for "scipy.optimize"  [import-untyped]
+src/shield_ai/application/use_cases/calibrate_coefficients.py:16: note: Hint: "python3 -m pip install scipy-stubs"
+src/shield_ai/application/use_cases/calibrate_coefficients.py:16: note: (or run "mypy --install-types" to install all missing stub packages)
+src/shield_ai/application/use_cases/calibrate_coefficients.py:16: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+src/shield_ai/infrastructure/parsers/inventory_parser.py:12: error: Library stubs not installed for "pandas"  [import-untyped]
+src/shield_ai/infrastructure/parsers/inventory_parser.py:12: note: Hint: "python3 -m pip install pandas-stubs"
+src/shield_ai/infrastructure/database/models.py: error: Source file found twice under different module names: "shield_ai.infrastructure.database.models" and "src.shield_ai.infrastructure.database.models"
+src/shield_ai/infrastructure/database/models.py: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#mapping-file-paths-to-modules for more info
+src/shield_ai/infrastructure/database/models.py: note: Common resolutions include: a) adding `__init__.py` somewhere, b) using `--explicit-package-bases` or adjusting MYPYPATH
+Found 3 errors in 3 files (errors prevented further checking)

@@ -1,0 +1,88 @@
+************* Module shield_ai.main_calibrate
+src/shield_ai/main_calibrate.py:1:0: E0401: Unable to import 'src.shield_ai.application.use_cases.calibrate_coefficients' (import-error)
+src/shield_ai/main_calibrate.py:2:0: E0401: Unable to import 'src.shield_ai.infrastructure.database.session' (import-error)
+src/shield_ai/main_calibrate.py:3:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.calibration_repository' (import-error)
+src/shield_ai/main_calibrate.py:6:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.coefficient_repository' (import-error)
+src/shield_ai/main_calibrate.py:9:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.product_repository' (import-error)
+************* Module shield_ai.domain.shrinkage.strategies
+src/shield_ai/domain/shrinkage/strategies.py:148:4: R0914: Too many local variables (16/15) (too-many-locals)
+************* Module shield_ai.presentation.ui.pages.1_parse
+src/shield_ai/presentation/ui/pages/1_parse.py:9:0: E0401: Unable to import 'src.shield_ai.infrastructure.parsers.inventory_parser' (import-error)
+************* Module shield_ai.presentation.ui.pages.2_calibrate
+src/shield_ai/presentation/ui/pages/2_calibrate.py:8:0: E0401: Unable to import 'src.shield_ai.infrastructure.database.session' (import-error)
+src/shield_ai/presentation/ui/pages/2_calibrate.py:9:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.calibration_repository' (import-error)
+src/shield_ai/presentation/ui/pages/2_calibrate.py:12:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.coefficient_repository' (import-error)
+src/shield_ai/presentation/ui/pages/2_calibrate.py:15:0: E0401: Unable to import 'src.shield_ai.infrastructure.repositories.product_repository' (import-error)
+src/shield_ai/presentation/ui/pages/2_calibrate.py:31:8: W0621: Redefining name 'results' from outer scope (line 50) (redefined-outer-name)
+************* Module shield_ai.presentation.ui.pages.5_shrinkage_analysis
+src/shield_ai/presentation/ui/pages/5_shrinkage_analysis.py:42:19: W0621: Redefining name 'coeffs' from outer scope (line 89) (redefined-outer-name)
+************* Module shield_ai.infrastructure.parsers.inventory_parser
+src/shield_ai/infrastructure/parsers/inventory_parser.py:49:12: W1203: Use lazy % formatting in logging functions (logging-fstring-interpolation)
+************* Module shield_ai.infrastructure.repositories.calibration_repository
+src/shield_ai/infrastructure/repositories/calibration_repository.py:6:0: E0401: Unable to import 'src.shield_ai.infrastructure.database.models' (import-error)
+************* Module shield_ai.infrastructure.repositories.coefficient_repository
+src/shield_ai/infrastructure/repositories/coefficient_repository.py:49:12: C0415: Import outside toplevel (datetime.datetime) (import-outside-toplevel)
+************* Module shield_ai.infrastructure.database.session
+src/shield_ai/infrastructure/database/session.py:1:0: R0801: Similar lines in 2 files
+==shield_ai.presentation.ui.pages.3_forecast:[23:64]
+==shield_ai.presentation.ui.pages.5_shrinkage_analysis:[118:157]
+    with st.spinner("Расчёт прогноза (ВЗВЕШЕННАЯ МОДЕЛЬ)..."):
+        try:
+            with get_session() as session:
+                use_case = ForecastShrinkageUseCase(session)
+                forecasts = use_case.execute_all()
+
+            if forecasts:
+                total_shrinkage = sum(f["predicted_shrinkage"] for f in forecasts)
+
+                st.success(f"✅ Прогноз для {len(forecasts)} партий")
+
+                import pandas as pd
+
+                df = pd.DataFrame(forecasts)
+
+                for product_name in df["product_name"].unique():
+                    product_forecasts = df[df["product_name"] == product_name]
+
+                    with st.expander(f"🐟 {product_name}"):
+                        for _, f in product_forecasts.iterrows():
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("Партия", f["arrival_date"])
+                            with col2:
+                                st.metric(
+                                    "Прогноз усушки",
+                                    f"{f['predicted_shrinkage']:.2f} кг",
+                                )
+                            with col3:
+                                st.metric(
+                                    "Должно остаться",
+                                    f"{f['theoretical_remaining']:.2f} кг",
+                                )
+                            with col4:
+                                st.metric("Дней хранения", f"{f['days_stored']}")
+
+                st.divider()
+                st.metric("💧 ОБЩАЯ ПРОГНОЗНАЯ УСУШКА", f"{total_shrinkage:.2f} кг")
+            else:
+                st.warning("⚠️ Нет активных партий")
+        except Exception as e: (duplicate-code)
+src/shield_ai/infrastructure/database/session.py:1:0: R0801: Similar lines in 2 files
+==shield_ai.main_calibrate:[12:24]
+==shield_ai.presentation.ui.pages.2_calibrate:[19:31]
+    with get_session() as session:
+        product_repository = SQLAlchemyProductRepository(session)
+        calibration_data_repository = SQLAlchemyCalibrationDataRepository(session)
+        coefficient_repository = SQLAlchemyCoefficientRepository(session)
+
+        use_case = CalibrateCoefficientsUseCase(
+            product_repository=product_repository,
+            calibration_data_repository=calibration_data_repository,
+            coefficient_repository=coefficient_repository,
+        )
+
+        results = use_case.execute_all() (duplicate-code)
+
+-----------------------------------
+Your code has been rated at 9.12/10
+

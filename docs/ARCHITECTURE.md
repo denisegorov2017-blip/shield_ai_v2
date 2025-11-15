@@ -17,6 +17,7 @@ src/shield_ai/
 │   └── validation/      # Валидация
 ├── application/         # 📋 Use Cases
 │   └── use_cases/
+│       ├── audit_inventory.py
 │       ├── calibrate_coefficients.py
 │       └── forecast_shrinkage.py
 ├── infrastructure/      # 🔧 Внешние зависимости
@@ -24,9 +25,16 @@ src/shield_ai/
 │   │   ├── base.py
 │   │   ├── models.py     # ORM модели
 │   │   └── session.py
-│   ├── excel/          # Excel парсеры
-│   └── config/         # DI контейнер
+│   ├── parsers/         # Парсеры
+│   │   └── inventory_parser.py
+│   ├── exporters/       # Экспортеры
+│   │   ├── json_exporter.py
+│   │   ├── markdown_exporter.py
+│   │   └── sqlite_exporter.py
+│   └── config/          # DI контейнер
 └── presentation/        # 🖥️ UI/API
+    ├── cli/             # CLI интерфейс
+    │   └── main.py
     └── ui/
         └── pages/       # Streamlit страницы
 ```
@@ -59,6 +67,7 @@ ______________________________________________________________________
 **Содержит**:
 
 - `use_cases/` - Бизнес-сценарии
+  - `AuditInventoryUseCase` - Аудит остатков
   - `CalibrateCoefficientsUseCase` - Калибровка
   - `ForecastShrinkageUseCase` - Прогнозирование
 - `dto/` - Data Transfer Objects
@@ -75,7 +84,8 @@ ______________________________________________________________________
 **Содержит**:
 
 - `database/` - SQLAlchemy 2.0 ORM
-- `excel/` - Парсеры Excel
+- `parsers/` - Парсеры (например, InventoryParser)
+- `exporters/` - Экспортеры (JsonExporter, MarkdownExporter, SQLiteExporter)
 - `config/` - DI контейнер
 
 **Принципы**:
@@ -89,7 +99,8 @@ ______________________________________________________________________
 
 **Содержит**:
 
-- `ui/pages/` - Streamlit страницы
+- `cli/` - CLI интерфейс (main.py)
+- `ui/pages/` - Streamlit страницы (1_parse.py, 2_calibrate.py, и т.д.)
 - `api/` - FastAPI endpoints (опционально)
 
 **Принципы**:

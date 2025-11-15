@@ -1,0 +1,6 @@
+- [x] Ветка `refactor/flat-structure` создана.
+- [x] Доменные сущности в `src/shield_ai/domain/entities/batch.py` обновлены (содержат `BatchMovement` и `BatchBalance`).
+- [x] Создан `src/shield_ai/domain/entities/shrinkage_profile.py` с датаклассом `ShrinkageCalculation`.
+- [x] Парсер `src/shield_ai/infrastructure/parsers/inventory_parser.py` упрощен до flat-преобразования.
+- [x] Use case `src/shield_ai/application/use_cases/calibrate_coefficients.py` отделен от инфраструктуры.
+- [x] UI-компонент `src/shield_ai/presentation/ui/pages/1_parse.py` упрощен и обновлен.

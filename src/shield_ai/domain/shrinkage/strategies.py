@@ -6,6 +6,7 @@
 1. Порционная модель (99.9% точность) - используется для калибровки
 2. Взвешенная интегральная модель (99.5% точность) - используется для прогнозов
 3. Модель совместимости (85-90% точность) - для быстрых оценок и legacy систем
+4. Простая стратегия (упрощенный расчет усушки) - для упрощенного учета
 
 Каждая стратегия реализует абстрактный класс ShrinkageStrategy и предоставляет
 различные подходы к вычислению усушки в зависимости от требуемой точности и
@@ -13,16 +14,34 @@
 """
 
 import math
-from abc import ABC, abstractmethod
-from datetime import timedelta
-from typing import Any, Dict, List, Type
+from abc import (
+    ABC,
+    abstractmethod,
+)
+from datetime import (
+    timedelta,
+)
+from typing import (
+    Any,
+    Dict,
+    List,
+    Type,
+)
+
+from src.shield_ai.domain.entities.batch import (
+    BatchBalance,
+    BatchMovement,
+)
+from src.shield_ai.domain.entities.shrinkage_profile import (
+    ShrinkageCalculation,
+)
 
 
 class ShrinkageStrategy(ABC):
     """
     Базовая стратегия расчёта усушки
 
-    Абстрактный класс, определяющий интерфейс для всех стратегий расчета усушки.
+    Абстрактный класс, определяющий интерфейс для всех стратегии расчета усушки.
     Все реализации должны предоставить методы для вычисления усушки, получения
     названия стратегии и ожидаемой точности. Это позволяет использовать разные
     подходы к расчету усушки в зависимости от требований к точности и доступным
@@ -65,7 +84,7 @@ class ShrinkageStrategy(ABC):
 
 class PortionStrategy(ShrinkageStrategy):
     """
-    ПОРЦИОННАЯ МОДЕЛЬ (99.9% точность)
+    ПОРЦИОННАЯ МОДЕЛЬ (9.9% точность)
 
     Используется для калибровки коэффициентов.
     Каждая продажа - отдельная порция со своим временем хранения.
@@ -100,7 +119,9 @@ class PortionStrategy(ShrinkageStrategy):
         Returns:
             Общая усушка для всех продаж в партии
         """
-        a, b, c = coeffs["a"], coeffs["b"], coeffs["c"]
+        coefficient_a = coeffs["a"]
+        coefficient_b = coeffs["b"]
+        coefficient_c = coeffs["c"]
         arrival_date = batch_data["arrival_date"]
         sales = batch_data.get("sales", [])
 
@@ -108,14 +129,17 @@ class PortionStrategy(ShrinkageStrategy):
 
         for sale in sales:
             # Вычисление количества дней между датой продажи и датой прибытия партии
-            days = (sale["date"] - arrival_date).days
-            if days < 0:
+            storage_days = (sale["date"] - arrival_date).days
+            if storage_days < 0:
                 # Пропускаем продажи, которые произошли до прибытия партии
                 continue
 
             # Расчет усушки для одной порции по формуле: m * [a * (1 - e^(-b*t)) + c]
-            shrinkage = sale["quantity"] * (a * (1 - math.exp(-b * days)) + c)
-            total_shrinkage += shrinkage
+            portion_shrinkage = sale["quantity"] * (
+                coefficient_a * (1 - math.exp(-coefficient_b * storage_days))
+                + coefficient_c
+            )
+            total_shrinkage += portion_shrinkage
 
         return total_shrinkage
 
@@ -170,9 +194,10 @@ class WeightedStrategy(ShrinkageStrategy):
             Общая усушка за период
         """
         # Извлечение параметров из batch_data
-        a, b = coeffs["a"], coeffs["b"]
-        M0 = batch_data["initial_mass"]
-        current_mass = M0
+        coefficient_a = coeffs["a"]
+        coefficient_b = coeffs["b"]
+        initial_mass = batch_data["initial_mass"]
+        current_mass = initial_mass
         arrival_date = batch_data["arrival_date"]
         end_date = batch_data["end_date"]
         daily_sales = batch_data.get("daily_sales", {})
@@ -183,11 +208,16 @@ class WeightedStrategy(ShrinkageStrategy):
         total_shrinkage = 0.0
 
         while current_date <= end_date:
-            # Вычисление скорости усушки: M0 * a * b * e^(-b * day_counter)
+            # Вычисление скорости усушки: initial_mass * a * b * e^(-b * day_counter)
             # Это производная от функции усушки по времени
-            shrinkage_rate = M0 * a * b * math.exp(-b * day_counter)
+            shrinkage_rate = (
+                initial_mass
+                * coefficient_a
+                * coefficient_b
+                * math.exp(-coefficient_b * day_counter)
+            )
             # Учет текущей массы: усушка пропорциональна текущему остатку
-            mass_ratio = current_mass / M0 if M0 > 0 else 0
+            mass_ratio = current_mass / initial_mass if initial_mass > 0 else 0
             # Суточная усушка с учетом текущей массы
             daily_shrinkage = shrinkage_rate * mass_ratio
 
@@ -210,7 +240,7 @@ class WeightedStrategy(ShrinkageStrategy):
         return "99.5%"
 
 
-class FinalStrategy(ShrinkageStrategy):
+class CompatibilityStrategy(ShrinkageStrategy):
     """
     МОДЕЛЬ СОВМЕСТИМОСТИ (85-90% точность)
 
@@ -247,13 +277,18 @@ class FinalStrategy(ShrinkageStrategy):
         Returns:
             Усушка для всей партии за весь период хранения
         """
-        a, b, c = coeffs["a"], coeffs["b"], coeffs["c"]
-        M0 = batch_data["initial_mass"]
-        T = batch_data["days_stored"]
+        coefficient_a = coeffs["a"]
+        coefficient_b = coeffs["b"]
+        coefficient_c = coeffs["c"]
+        initial_mass = batch_data["initial_mass"]
+        storage_days = batch_data["days_stored"]
 
-        # Формула: M0 * [a * (1 - e^(-b*T)) + c]
-        # где M0 - начальная масса, T - общее время хранения
-        shrinkage: float = M0 * (a * (1 - math.exp(-b * T)) + c)
+        # Формула: initial_mass * [a * (1 - e^(-b*T)) + c]
+        # где initial_mass - начальная масса, storage_days - общее время хранения
+        shrinkage: float = initial_mass * (
+            coefficient_a * (1 - math.exp(-coefficient_b * storage_days))
+            + coefficient_c
+        )
         return shrinkage
 
     def get_name(self) -> str:
@@ -261,6 +296,167 @@ class FinalStrategy(ShrinkageStrategy):
 
     def get_accuracy(self) -> str:
         return "85-90%"
+
+
+class ShrinkageCalculationStrategy(ABC):
+    """
+    Протокол для стратегии расчета усушки на основе BatchMovement и BatchBalance
+
+    Этот интерфейс определяет метод для упрощенного расчета усушки,
+    который принимает списки движений и остатков, и возвращает результаты
+    в виде списка ShrinkageCalculation.
+    """
+
+    @abstractmethod
+    def calculate_shrinkage(
+        self, movements: List[BatchMovement], balances: List[BatchBalance]
+    ) -> List[ShrinkageCalculation]:
+        """
+        Рассчитывает усушку на основе данных о движениях и остатках
+
+        Args:
+            movements: Список движений товара
+            balances: Список остатков товара
+
+        Returns:
+            Список результатов расчета усушки
+        """
+
+    @abstractmethod
+    def get_coefficients(self) -> dict:
+        """
+        Возвращает коэффициенты усушки для данной стратегии
+
+        Returns:
+            dict: Словарь с коэффициентами усушки
+        """
+        """
+        Рассчитывает усушку на основе данных о движениях и остатках
+
+        Args:
+            movements: Список движений товара
+            balances: Список остатков товара
+
+        Returns:
+            Список результатов расчета усушки
+        """
+
+
+class SimpleShrinkageStrategy(ShrinkageCalculationStrategy):
+    """
+    Простая стратегия расчета усушки
+
+    Упрощенная логика расчета усушки без сложной логики FIFO.
+    Рассчитывает усушку как разницу между ожидаемым и фактическим остатками.
+    """
+
+    # Константы для типов движений
+    IN_MOVEMENT_TYPES = {"приход", "in", "receipt", "поступление"}
+    OUT_MOVEMENT_TYPES = {"расход", "out", "shipment", "продажа"}
+    """
+    Простая стратегия расчета усушки
+    
+    Упрощенная логика расчета усушки без сложной логики FIFO.
+    Рассчитывает усушку как разницу между ожидаемым и фактическим остатками.
+    """
+
+    def get_coefficients(self) -> dict:
+        """
+        Возвращает коэффициенты усушки для простой стратегии.
+        В простой стратегии коэфициенты не используются, возвращаем пустой словарь.
+        
+        Returns:
+            dict: Пустой словарь коэффициентов
+        """
+        return {}
+
+    def calculate_shrinkage(
+        self, movements: List[BatchMovement], balances: List[BatchBalance]
+    ) -> List[ShrinkageCalculation]:
+        """
+        Рассчитывает усушку по упрощенной логике
+
+        Алгоритм:
+        1. Для каждой номенклатуры суммируем все движения (приходы и расходы)
+        2. Находим начальный и конечный остатки
+        3. Рассчитываем ожидаемый остаток как начальный остаток + приход - расход
+        4. Усушка = ожидаемый остаток - фактический остаток
+        5. Отклонение = усушка / ожидаемый остаток (если ожидаемый остаток > 0)
+
+        Args:
+            movements: Список движений товара
+            balances: Список остатков товара
+
+        Returns:
+            Список результатов расчета усушки
+        """
+        results = []
+
+        # Группируем движения по номенклатуре
+        movement_by_nomenclature = {}
+        for movement in movements:
+            if movement.nomenclature not in movement_by_nomenclature:
+                movement_by_nomenclature[movement.nomenclature] = []
+            movement_by_nomenclature[movement.nomenclature].append(movement)
+
+        # Группируем остатки по номенклатуре
+        balance_by_nomenclature = {}
+        for balance in balances:
+            if balance.nomenclature not in balance_by_nomenclature:
+                balance_by_nomenclature[balance.nomenclature] = []
+            balance_by_nomenclature[balance.nomenclature].append(balance)
+
+        # Рассчитываем усушку для каждой номенклатуры
+        for nomenclature in set(movement_by_nomenclature.keys()) | set(
+            balance_by_nomenclature.keys()
+        ):
+            movements_for_nom = movement_by_nomenclature.get(nomenclature, [])
+            balances_for_nom = balance_by_nomenclature.get(nomenclature, [])
+
+            # Рассчитываем суммарные движения (приход и расход)
+            total_in = sum(
+                m.quantity
+                for m in movements_for_nom
+                if m.movement_type.lower() in self.IN_MOVEMENT_TYPES
+            )
+            total_out = sum(
+                m.quantity
+                for m in movements_for_nom
+                if m.movement_type.lower() in self.OUT_MOVEMENT_TYPES
+            )
+
+            # Находим начальный и конечный остатки
+            if balances_for_nom:
+                # Сортируем остатки по дате, чтобы определить начальный и конечный
+                sorted_balances = sorted(balances_for_nom, key=lambda x: x.date)
+                initial_balance = sorted_balances[0].balance
+                final_balance = sorted_balances[-1].balance
+            else:
+                initial_balance = 0
+                final_balance = 0
+
+            # Рассчитываем ожидаемый остаток
+            expected_balance = initial_balance + total_in - total_out
+
+            # Рассчитываем усушку как разницу между ожидаемым и фактическим остатками
+            calculated_shrinkage = expected_balance - final_balance
+
+            # Рассчитываем отклонение
+            deviation = 0
+            if expected_balance != 0:
+                deviation = calculated_shrinkage / abs(expected_balance)
+
+            # Создаем результат расчета
+            result = ShrinkageCalculation(
+                nomenclature=nomenclature,
+                calculated_shrinkage=calculated_shrinkage,
+                actual_balance=final_balance,
+                deviation=deviation,
+            )
+
+            results.append(result)
+
+        return results
 
 
 class StrategyFactory:
@@ -273,10 +469,17 @@ class StrategyFactory:
     созданием в различных частях приложения.
     """
 
+    # Словарь доступных стратегий
     _strategies: Dict[str, Type[ShrinkageStrategy]] = {
         "portion": PortionStrategy,
         "weighted": WeightedStrategy,
-        "final": FinalStrategy,
+        "compatibility": CompatibilityStrategy,
+    }
+
+    _strategies: Dict[str, Type[ShrinkageStrategy]] = {
+        "portion": PortionStrategy,
+        "weighted": WeightedStrategy,
+        "compatibility": CompatibilityStrategy,
     }
 
     @classmethod
@@ -285,7 +488,7 @@ class StrategyFactory:
         Создаёт стратегию по имени
 
         Args:
-            strategy_name: Имя стратегии ('portion', 'weighted', или 'final')
+            strategy_name: Имя стратегии ('portion', 'weighted', или 'compatibility')
 
         Returns:
             Экземпляр соответствующей стратегии

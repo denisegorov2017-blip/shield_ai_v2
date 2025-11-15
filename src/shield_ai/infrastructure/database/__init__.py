@@ -2,9 +2,22 @@
 Database infrastructure - SQLAlchemy 2.0
 """
 
-from .base import Base, engine, init_db
-from .models import BatchModel, InventoryModel, ProductModel, SaleModel, ShrinkageCoefficientModel
-from .session import SessionLocal, get_session
+from .base import (
+    Base,
+    engine,
+    init_db,
+)
+from .models import (
+    BatchModel,
+    InventoryModel,
+    ProductModel,
+    SaleModel,
+    ShrinkageCoefficientModel,
+)
+from .session import (
+    SessionLocal,
+    get_session,
+)
 
 __all__ = [
     "Base",

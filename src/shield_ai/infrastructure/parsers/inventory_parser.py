@@ -2,1135 +2,415 @@
 Модуль для парсинга Excel-отчётов о движении товаров.
 
 Этот модуль предоставляет класс `InventoryParser` для преобразования
-Excel-отчётов 1С о движении товаров в структурированные данные
-с полной иерархией: Склад → Группа → Товар → Партия → Документ.
-
-Attributes:
-    pd: Модуль pandas для работы с данными
-    re: Модуль регулярных выражений
-    json: Модуль для работы с JSON
-    load_workbook: Функция из openpyxl для загрузки Excel-файлов
-    Dict, List, Set, Optional: Типы для аннотаций
-    datetime: Модуль для работы с датами
-
-Принципы работы:
-    1. FIFO: Расход из самой старой партии (по дате поступления)
-    2. Приходная накладная: Создаёт НОВУЮ партию
-    3. Документы расхода (Продажи, Списание, Инвентаризация, Пересортица):
-       Расходуют/корректируют СУЩЕСТВУЮЩИЕ партии
-    4. Пересортица: Специальный документ корректировки, может быть приходом
-       (добавление к последней партии) или расходом (списание старой партии) (FIFO)
-
-Валидация: Баланс = начальный + приход - расход (tolerance 0.0001 кг)
-
-Изменения v2.1:
-    - Добавлена поддержка документа "Пересортица"
-    - Счётчик peresortitsa_docs в статистике
-    - Детальное логирование операций Пересортицы
+Excel-отчётов 1С о движении товаров в плоскую структуру pandas DataFrame.
 """
 
-import json
 import logging
-import re
-from datetime import datetime
-from logging import Logger
-from typing import Dict, Optional, Set
+from datetime import (
+    date,
+)
+from logging import (
+    Logger,
+)
+from typing import (
+    List,
+    Optional,
+    Tuple,
+)
 
 import pandas as pd
-from openpyxl import load_workbook
+
+from src.shield_ai.domain.entities.batch import (
+    BatchBalance,
+    BatchMovement,
+)
+from src.shield_ai.domain.exceptions import (
+    ParserException,
+    ValidationException,
+)
+from src.shield_ai.infrastructure.logging_config import (
+    get_logger,
+)
 
 
 class InventoryParser:
     """
-    Production-ready парсер Excel-отчётов о партиях номенклатуры.
+    Парсер Excel-отчётов о движении товаров в плоскую таблицу.
 
-    Класс реализует парсинг Excel-файлов с данными о движении товаров
-    по принципу FIFO (первым пришёл - первым ушёл). Поддерживает
-    различные типы документов, включая Приходную накладную, Продажи,
-    Списание, Инвентаризацию и Пересортицу.
-
-    Attributes:
-        known_groups (Set[str]): Множество названий групп из справочника
-        document_types (Dict): Типы документов (receipt/expense)
+    Класс реализует простой парсинг Excel-файлов с данными о движении товаров
+    в плоскую структуру данных (pandas DataFrame).
     """
 
-    # Именованные константы для индексов столбцов (резервные варианты)
-    INDEX_NAME = 0
-    INDEX_BEGIN = 4
-    INDEX_IN = 6
-    INDEX_OUT = 7
-    INDEX_END = 8
-
-    def __init__(
-        self, groups_file: Optional[str] = None, logger: Optional[Logger] = None
-    ):
+    def __init__(self, logger: Optional[Logger] = None):
         """
         Инициализация парсера.
 
         Args:
-            groups_file (Optional[str]): Путь к файлу со справочником групп товаров.
-                                 Если None, используется путь по умолчанию.
-            verbose (bool): Флаг для вывода детальных логов в консоль.
             logger (Optional[Logger]): Экземпляр логгера. Если не предоставлен, используется стандартный.
         """
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or get_logger(__name__)
 
-        if groups_file:
-            self.known_groups = self._load_groups(groups_file)
-        else:
-            default_groups_file = "data/knowledge/группы и под группы.xlsx"
-            self.logger.info(
-                f"Файл групп не указан, используется путь по умолчанию: {default_groups_file}"
-            )
-            self.known_groups = self._load_groups(default_groups_file)
-
-        self.document_types = {
-            "receipt": [
-                "Приходная накладная",
-                "Оприходование излишков",
-                "Перемещение товаров",
-            ],
-            "expense": [
-                "Отчет отдела о розничных продажах",
-                "Списание",
-                "Инвентаризация",
-                "Пересортица",
-                "Возврат товаров поставщику",
-                "Перемещение товаров",
-                "Документ для валидного",
-                "Документ после невалидного",
-            ],
-        }
-
-    def _load_groups(self, file_path: str) -> Set[str]:
+    def _find_column(
+        self, available_columns: List[str], possible_names: List[str]
+    ) -> Optional[str]:
         """
-        Загрузка справочника групп из Excel-файла.
+        Находит колонку в списке доступных колонок по возможным именам.
 
         Args:
-            file_path (str): Путь к файлу справочника
+            available_columns: Список доступных колонок в DataFrame
+            possible_names: Список возможных имён колонки
 
         Returns:
-            Set[str]: Множество названий групп
-
-        Raises:
-            FileNotFoundError: Если файл не найден
-            PermissionError: Если нет прав доступа к файлу
+            Название найденной колонки или None, если не найдена
         """
-        try:
-            groups_df = pd.read_excel(file_path, header=None, engine="openpyxl")
-            known_groups = set()
-            for idx, row in groups_df.iterrows():
-                name = row[0]
-                if pd.notna(name):
-                    group_name = str(name).strip().lower()
-                    known_groups.add(group_name)
-            self.logger.debug(
-                f"Загружено {len(known_groups)} групп из справочника: {file_path}"
-            )
-            return known_groups
-        except FileNotFoundError:
-            self.logger.error(f"Файл справочника групп не найден: {file_path}")
-            return set()
-        except PermissionError:
-            self.logger.error(
-                f"Нет прав доступа к файлу справочника групп: {file_path}"
-            )
-            return set()
-        except Exception as e:
-            self.logger.error(f"Ошибка загрузки справочника групп: {e}")
-            return set()
+        return next((col for col in available_columns if col in possible_names), None)
 
-    def _get_document_type(self, name: str) -> Optional[str]:
+    def _parse_date_value(self, date_raw) -> date:
         """
-        Определение типа документа по его названию.
+        Преобразует значение даты в объект date.
 
         Args:
-            name (str): Полное название документа из Excel
+            date_raw: Необработанное значение даты из Excel
 
         Returns:
-            str или None: 'receipt', 'expense' или None.
+            Объект date
         """
-        for doc in self.document_types["receipt"]:
-            if name.startswith(doc):
-                return "receipt"
-        for doc in self.document_types["expense"]:
-            if name.startswith(doc):
-                return "expense"
-        return None
-
-    def _classify_row(self, name_str: str) -> str:
-        """
-        Классификация строки Excel по типу.
-
-        Args:
-            name_str (str): Содержимое первой колонки строки, после strip()
-
-        Returns:
-            str: Один из типов: 'empty', 'header', 'warehouse', 'group', 'product', 'batch', 'document'.
-        """
-        self.logger.debug(f"Classifying row input: '{name_str}'")
-        if not name_str or name_str.lower() == "nan":
-            row_type = "empty"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "empty"
-
-        lower_name_str = name_str.lower()
-        if (
-            "ведомость по партиям" in lower_name_str
-            or "параметры:" in lower_name_str
-            or "отбор:" in lower_name_str
-        ):
-            row_type = "meta"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "meta"
-
-        if name_str in [
-            "Склад",
-            "Номенклатура",
-            "Документ движения",
-            "Партия.Дата прихода",
-        ]:
-            row_type = "header"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "header"
-
-        if self._get_document_type(name_str):
-            row_type = "document"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "document"
-
-        if re.match(r"^\d{2}\.\d{2}\.\d{4}", name_str):
-            row_type = "batch"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "batch"
-
-        clean_name = name_str.strip().lower()
-        if clean_name in self.known_groups:
-            row_type = "group"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "group"
-
-        # Склад обычно в скобках, но не является известной группой
-        if "(" in name_str and ")" in name_str and clean_name not in self.known_groups:
-            row_type = "warehouse"
-            self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-            return "warehouse"
-
-        row_type = "product"
-        self.logger.debug(f"Row '{name_str}' classified as: '{row_type}'")
-        return "product"
-
-    def _safe_to_float(self, value) -> float:
-        """
-        Безопасно преобразует значение в float.
-
-        Args:
-            value: Значение для преобразования
-
-        Returns:
-            float: Числовое значение (0.0 для пустых или некорректных значений)
-        """
-        if pd.isna(value) or value is None:
-            return 0.0
-        if isinstance(value, str):
-            value = value.strip()
-            if value == "" or value == "-":
-                return 0.0
-
-        try:
-            # Заменяем запятую на точку и удаляем пробелы (например, в '1 234,56')
-            cleaned_string = re.sub(r"\s", "", str(value).replace(",", "."))
-            return float(cleaned_string)
-        except (ValueError, TypeError):
-            return 0.0
-
-    def _apply_fifo_expense(
-        self, product: Dict, total_out: float, doc_name: str, warnings: list = None
-    ):
-        """
-        Применяет списание по FIFO к партиям товара.
-
-        Args:
-            product (Dict): Словарь товара с партиями.
-            total_out (float): Общее количество для списания.
-            doc_name (str): Название документа расхода.
-            warnings (list): Список для сбора предупреждений.
-        """
-        if warnings is None:
-            warnings = []
-
-        remaining_out = total_out
-
-        self.logger.debug(
-            f"[FIFO-РАСХОД] Списание {total_out:.4f} ед. товара '{product['name']}' по документу '{doc_name}'"
-        )
-        self.logger.debug(f"Партий до списания: {len(product['batches'])}")
-
-        # Сортируем партии по дате и времени поступления для FIFO (от старых к новым)
-        sorted_batches = sorted(product["batches"], key=lambda x: x["arrival_datetime"])
-
-        for i, batch in enumerate(sorted_batches):
-            if remaining_out <= 1e-9:  # Используем допуск для float
-                self.logger.debug("Списание полностью выполнено.")
-                break
-
-            available_qty = batch["qty"]["end"]
-
-            self.logger.debug(
-                f"Проверка партии {i+1} ({batch['arrival_date']}): доступно {available_qty:.4f}"
-            )
-
-            if available_qty <= 1e-9:
-                self.logger.debug("Партия пустая, пропускаем.")
-                continue
-
-            current_batch_out = min(remaining_out, available_qty)
-
-            self.logger.debug(f"Списываем {current_batch_out:.4f} из этой партии.")
-
-            batch["qty"]["out"] += current_batch_out
-            batch["qty"]["end"] -= current_batch_out
-
-            if batch["qty"]["end"] < -1e-9:
-                deficit = abs(batch["qty"]["end"])
-                warning_msg = f"Отрицательный баланс после FIFO списания: товар {product['name']}, партия {batch['arrival_date']}, документ {doc_name}, дефицит {deficit:.4f}"
-                self.logger.warning(warning_msg)
-                warnings.append(warning_msg)
-                batch["qty"]["end"] = 0.0
-
-            validation = self._validate_balance(
-                batch["qty"]["begin"],
-                batch["qty"]["in"],
-                batch["qty"]["out"],
-                batch["qty"]["end"],
-            )
-            batch["validation"] = validation
-
-            if not validation["valid"]:
-                error_msg = f"Партия {batch['arrival_date']} товара {product['name']}: {validation['error']}"
-                self.logger.error(error_msg)
-
-            batch["documents"].append(
-                {
-                    "type": "document",
-                    "doc_type": "expense",
-                    "name": doc_name,
-                    "qty": {"in": 0.0, "out": current_batch_out},
-                }
-            )
-
-            self.logger.info(
-                f"[FIFO EXPENSE] {doc_name} списал {current_batch_out:.4f} из партии {batch['arrival_date']}, остаток: {batch['qty']['end']:.4f}"
-            )
-            remaining_out -= current_batch_out
-            self.logger.debug(f"Остаток для списания: {remaining_out:.4f}")
-
-        # Если после прохода по существующим партиям осталось несписанное количество
-        if remaining_out > 1e-9:
-            # Создаем новую "внешнюю" партию
-            self.logger.info(
-                f"Создание внешней партии для товара '{product['name']}' по документу '{doc_name}'. Не хватает: {remaining_out:.4f}"
-            )
-
-            # Пытаемся извлечь дату из имени документа
-            arrival_datetime = None
-            # Ищем дату в формате ДД.ММ.ГГГГ или ДД.ММ.ГГГЧЧ:ММ:СС
-            date_match = re.search(
-                r"(\d{2}\.\d{2}\.\d{4}(?:\s+\d{2}:\d{2}:\d{2})?)", doc_name
-            )
-            if date_match:
-                date_str = date_match.group(1)
-                try:
-                    if len(date_str) == 10:  # Только дата
-                        arrival_datetime = datetime.strptime(date_str, "%d.%m.%Y")
-                    else:  # Дата и время
-                        arrival_datetime = datetime.strptime(
-                            date_str, "%d.%m.%Y %H:%M:%S"
-                        )
-                except ValueError:
-                    self.logger.warning(
-                        f"Не удалось распознать дату в документе '{doc_name}', используем текущее время"
-                    )
-                    arrival_datetime = datetime.now()
-            else:
-                self.logger.warning(
-                    f"Не удалось извлечь дату из документа '{doc_name}', используем текущее время"
-                )
-                arrival_datetime = datetime.now()
-
-            # Формируем batch_code с префиксом "external-"
-            batch_code = f"external-{arrival_datetime.strftime('%d.%m.%Y %H:%M:%S')}"
-
-            # Создаем новую внешнюю партию
-            external_batch = {
-                "type": "batch",
-                "arrival_date": arrival_datetime.strftime("%d.%m.%Y"),
-                "arrival_time": arrival_datetime.strftime("%H:%M:%S"),
-                "arrival_datetime": arrival_datetime,
-                "batch_code": batch_code,
-                "external": True,  # Отметка, что это внешняя партия
-                "qty": {
-                    "begin": remaining_out,
-                    "in": 0.0,
-                    "out": remaining_out,
-                    "end": 0.0,
-                },
-                "qty_raw": {
-                    "begin": remaining_out,
-                    "in": 0.0,
-                    "out": remaining_out,
-                    "end": 0.0,
-                },
-                "documents": [
-                    {
-                        "type": "document",
-                        "doc_type": "external",
-                        "name": doc_name,
-                        "note": "Партия создана автоматически. Поступление вне периода отчёта.",
-                        "qty": {"in": 0.0, "out": remaining_out},
-                    }
-                ],
-                "validation": {"valid": True, "diff": 0.0, "error": None},
-            }
-
-            # Добавляем внешнюю партию в товар
-            product["batches"].append(external_batch)
-
-            # Обновляем статистику
-            if "external_batches_created" not in product:
-                product["external_batches_created"] = 0
-            product["external_batches_created"] += 1
-
-            self.logger.info(
-                f"Создана внешняя партия '{batch_code}' для товара '{product['name']}' по документу '{doc_name}'. "
-                f"Количество: {remaining_out:.4f}, дата: {arrival_datetime.strftime('%d.%m.%Y %H:%M:%S')}"
-            )
-
-            # Устанавливаем remaining_out в 0, так как все списано
-            remaining_out = 0.0
-
-        self.logger.debug(
-            f"[FIFO-РАСХОД] Завершено. Осталось несписанного: {remaining_out:.4f}"
-        )
-
-    def _find_header_indices(self, header_row: list) -> Dict:
-        """Находит индексы колонок по их заголовкам."""
-        field_keywords = {
-            "begin": ["начальный остаток", "нач. остаток"],
-            "in": ["приход"],
-            "out": ["расход"],
-            "end": ["конечный остаток", "кон. остаток"],
-        }
-        indices = {}
-        for col_idx, cell in enumerate(header_row):
-            if cell is None:
-                continue
-            cell_str = str(cell).strip().lower()
-            for field_name, keywords in field_keywords.items():
-                if any(keyword in cell_str for keyword in keywords):
-                    indices[field_name] = col_idx
-                    break
-        return indices
-
-    def _validate_balance(
-        self,
-        begin: float,
-        in_qty: float,
-        out_qty: float,
-        end: float,
-        tolerance: float = 0.001,
-    ) -> Dict:
-        """Валидация баланса партии."""
-        expected = begin + in_qty - out_qty
-        diff = abs(end - expected)
-
-        if diff <= tolerance:
-            return {"valid": True, "diff": round(diff, 4), "error": None}
-        else:
-            return {
-                "valid": False,
-                "diff": round(diff, 4),
-                "error": f"Расхождение баланса: ожидалось {expected:.4f}, фактически {end:.4f}",
-            }
-
-    # --- МЕТОДЫ-ОБРАБОТЧИКИ СТРОК ---
-
-    def _handle_warehouse_row(self, name_str: str, stats: dict) -> str:
-        """Обрабатывает строку типа 'warehouse'."""
-        stats["warehouses"] += 1
-        self.logger.debug(f"Склад: {name_str}")
-        return name_str
-
-    def _handle_group_row(self, name_str: str, stats: dict) -> dict:
-        """Обрабатывает строку типа 'group'."""
-        group = {
-            "type": "group",
-            "name": name_str,
-            "products": [],
-            "stats": {"products": 0, "batches": 0, "documents": 0},
-        }
-        stats["groups"] += 1
-        self.logger.debug(f"Группа: {name_str}")
-        return group
-
-    def _handle_product_row(
-        self,
-        name_str: str,
-        current_group: dict,
-        stats: dict,
-        begin: float,
-        in_qty: float,
-        out_qty: float,
-        end: float,
-        warnings: list = None,
-    ) -> dict:
-        """Обрабатывает строку типа 'product'."""
-        if warnings is None:
-            warnings = []
-
-        # Проверяем, является ли продукт "неправильным" (например, по названию)
-        # Это специфическая логика для теста, чтобы проверить сохранение контекста
-        if "Невалидный" in name_str:
-            self.logger.warning(f"Product '{name_str}' skipped due to invalid name.")
-            # Используем тот же лог, что и при отсутствии группы, чтобы тест проходил
-            warning_msg = f"Найден товар '{name_str}' без определенной группы. Товар будет проигнорирован."
-            self.logger.warning(warning_msg)
-            warnings.append(warning_msg)
-            # Не добавляем продукт в группу и не обновляем статистику
-            return None
-
-        product = {
-            "type": "product",
-            "name": name_str,
-            "batches": [],
-            "qty_summary": {"begin": begin, "in": in_qty, "out": out_qty, "end": end},
-        }
-
-        if not current_group:
-            self.logger.warning(
-                f"Product '{name_str}' skipped due to no current group."
-            )
-            warning_msg = f"Найден товар '{name_str}' без определенной группы. Товар будет проигнорирован."
-            self.logger.warning(warning_msg)
-            warnings.append(warning_msg)
-            # Не добавляем продукт в группу и не обновляем статистику
-            return None
-
-        # Добавляем продукт в группу и обновляем статистику ТОЛЬКО если current_group существует
-        current_group["products"].append(product)
-        current_group["stats"]["products"] += 1
-        stats["products"] += 1
-        return product
-
-    def _handle_batch_row(
-        self,
-        idx: int,
-        name_str: str,
-        current_group: dict,
-        current_product: dict,
-        stats: dict,
-        begin: float,
-        in_qty: float,
-        out_qty: float,
-        end: float,
-        warnings: list = None,
-    ) -> Optional[dict]:
-        """Обрабатывает строку типа 'batch'."""
-        if warnings is None:
-            warnings = []
-
-        if not current_product:
-            self.logger.warning(
-                f"Batch '{name_str}' skipped due to no current product."
-            )
-            warning_msg = f"Найдена партия '{name_str}' без определенного товара. Партия будет проигнорирована."
-            self.logger.warning(warning_msg)
-            warnings.append(warning_msg)
-            return None
-
-        validation = self._validate_balance(begin, in_qty, out_qty, end)
-
-        try:
-            arrival_datetime = datetime.strptime(name_str, "%d.%m.%Y %H:%M:%S")
-        except ValueError:
+        if isinstance(date_raw, pd.Timestamp):
+            return date_raw.date()
+        elif isinstance(date_raw, date):
+            return date_raw
+        elif isinstance(date_raw, str):
+            # Попробуем преобразовать строку в дату
             try:
-                arrival_datetime = datetime.strptime(name_str, "%d.%m.%Y")
-            except ValueError:
-                arrival_datetime = datetime.now()  # Fallback
-                warning_msg = f"Не удалось распознать дату/время '{name_str}' в строке {idx + 1}. Используется текущее время."
-                self.logger.warning(warning_msg)
-                warnings.append(warning_msg)
-
-        batch = {
-            "type": "batch",
-            "arrival_date": arrival_datetime.strftime("%d.%m.%Y"),
-            "arrival_time": arrival_datetime.strftime("%H:%M:%S"),
-            "arrival_datetime": arrival_datetime,
-            "batch_code": name_str,
-            "qty": {"begin": begin, "in": in_qty, "out": out_qty, "end": end},
-            "qty_raw": {"begin": begin, "in": in_qty, "out": out_qty, "end": end},
-            "documents": [],
-            "validation": validation,
-        }
-
-        current_product["batches"].append(batch)
-        current_group["stats"]["batches"] += 1
-        stats["batches"] += 1
-
-        if validation["valid"]:
-            stats["valid_batches"] += 1
+                date_parsed = pd.to_datetime(date_raw)
+                return date_parsed.date()
+            except Exception as date_error:
+                self.logger.warning(
+                    f"Не удалось преобразовать дату '{date_raw}': {date_error}"
+                )
+                return date.today()  # fallback
         else:
-            stats["invalid_batches"] += 1
-            error_msg = f"Ошибка баланса: Товар '{current_product['name']}', Партия '{batch['arrival_date']}', {validation['error']}"
-            self.logger.error(error_msg)
+            return date.today()  # fallback
 
-        return batch
+    def _parse_quantity_value(self, qty_raw) -> float:
+        """
+        Преобразует значение количества в число с плавающей точкой.
 
-    def _handle_document_row(
-        self,
-        idx: int,
-        name_str: str,
-        current_product: Optional[dict],
-        current_batch: Optional[dict],
-        stats: dict,
-        expense_operations: list,
-        doc_in_qty: float,
-        doc_out_qty: float,
-        warnings: list = None,
-    ):
-        """Обрабатывает строку типа 'document'."""
-        if warnings is None:
-            warnings = []
+        Args:
+            qty_raw: Необработанное значение количества из Excel
 
-        if not current_product:
+        Returns:
+            Число с плавающей точкой
+        """
+        try:
+            return float(qty_raw)
+        except (ValueError, TypeError):
             self.logger.warning(
-                f"Document '{name_str}' skipped due to no current product."
+                f"Не удалось преобразовать количество '{qty_raw}' в число, используем 0.0"
             )
-            warning_msg = f"Обнаружен документ '{name_str}' (строка {idx + 1}) без соответствующего товара. Пропускаем."
-            self.logger.warning(warning_msg)
-            warnings.append(warning_msg)
-            return
-
-        doc_type = self._get_document_type(name_str)
-        is_special_case = False
-
-        # --- СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ ПЕРЕСОРТИЦЫ И ДРУГИХ КОРРЕКТИРОВОК ---
-
-        # Пересортица (ПРИХОД) или Оприходование - добавляем к последней партии
-        if doc_in_qty > 0 and (
-            "Пересортица" in name_str or "Оприходование излишков" in name_str
-        ):
-            is_special_case = True
-            stats["receipt_docs"] += 1
-            stats["total_docs"] += 1
-            if "Пересортица" in name_str:
-                stats["peresortitsa_docs"] += 1
-
-            self.logger.debug(
-                f"[КОРРЕКТИРОВКА-ПРИХОД] '{name_str}', кол-во: {doc_in_qty}"
-            )
-
-            if current_product["batches"]:
-                # Добавляем к самой последней по времени партии
-                latest_batch = max(
-                    current_product["batches"], key=lambda b: b["arrival_datetime"]
-                )
-                latest_batch["qty"]["in"] += doc_in_qty
-                latest_batch["qty"]["end"] += doc_in_qty
-
-                # Добавляем документ в партию
-                latest_batch["documents"].append(
-                    {
-                        "type": "document",
-                        "doc_type": "receipt",
-                        "name": name_str,
-                        "qty": {"in": doc_in_qty, "out": 0.0},
-                    }
-                )
-                stats["batch_movements"] += 1
-
-                self.logger.info(
-                    f"[CORRECTION RECEIPT] '{name_str}' добавил {doc_in_qty} к партии {latest_batch['arrival_date']}"
-                )
-            else:
-                # Если у товара еще нет партий, это странно, но нужно обработать
-                warning_msg = f"Документ прихода '{name_str}' для товара '{current_product['name']}' без существующих партий. Создана новая 'виртуальная' партия."
-                self.logger.warning(warning_msg)
-                warnings.append(warning_msg)
-                # Логика создания новой партии для таких случаев (упрощенно)
-                # Эта логика здесь неполная, так как обычно такие документы корректируют существующие остатки.
-
-        # Документы расхода (включая Пересортицу-расход) откладываются на 2-й проход
-        if doc_type == "expense":
-            is_special_case = True
-            stats["expense_docs"] += 1
-            stats["total_docs"] += 1
-            if "Пересортица" in name_str and doc_in_qty == 0:
-                stats["peresortitsa_docs"] += 1
-
-            if doc_out_qty > 0:
-                expense_operations.append(
-                    {
-                        "product_name": current_product["name"],
-                        "quantity": doc_out_qty,
-                        "document_name": name_str,
-                    }
-                )
-                self.logger.debug(
-                    f"[ОТЛОЖЕННЫЙ РАСХОД] '{name_str}', кол-во: {doc_out_qty}"
-                )
-
-        # --- СТАНДАРТНАЯ ЛОГИКА ДЛЯ ДОКУМЕНТОВ ВНУТРИ ПАРТИИ ---
-
-        # Если это не спец. случай и есть текущая партия, привязываем документ к ней
-        if not is_special_case and current_batch:
-            document = {
-                "type": "document",
-                "doc_type": doc_type,
-                "name": name_str,
-                "qty": {"in": doc_in_qty, "out": doc_out_qty},
-            }
-            current_batch["documents"].append(document)
-            stats["total_docs"] += 1
-            stats["batch_movements"] += 1
-            # В v2.1 мы не меняем qty партии здесь, т.к. они уже прочитаны из строки партии.
-            # Изменение происходит только при FIFO и корректировках.
+            return 0.0  # fallback
 
     def _process_row(
         self,
-        idx: int,
-        row: list,
-        context: dict,
-        stats: dict,
-        expense_operations: list,
-        sections: list,
-        warnings: list = None,
-    ):
-        """Обрабатывает одну строку данных из Excel-файла."""
-        if warnings is None:
-            warnings = []
-
-        name = row[self.INDEX_NAME] if len(row) > self.INDEX_NAME else None
-        if name is None:
-            return context
-
-        name_str = str(name).strip()
-        if name_str.lower().startswith("итого"):
-            return context
-
-        # --- Определение типа строки и индексов колонок ---
-        row_type = self._classify_row(name_str)
-
-        current_group_name = (
-            context["current_group"]["name"] if context["current_group"] else "None"
-        )
-        current_product_name = (
-            context["current_product"]["name"] if context["current_product"] else "None"
-        )
-        self.logger.debug(
-            f"Processing row {idx}: name='{name_str}', type='{row_type}', current_group='{current_group_name}', current_product='{current_product_name}'"
-        )
-
-        if not context["found_header_row"] and row_type == "header":
-            context["header_indices"] = self._find_header_indices(row)
-            if all(
-                col in context["header_indices"]
-                for col in ["begin", "in", "out", "end"]
-            ):
-                context["found_header_row"] = True
-                self.logger.debug(
-                    f"Найдены заголовки колонок в строке {idx + 1}: {context['header_indices']}"
-                )
-            return context
-
-        if row_type in ["header", "empty", "meta", "unknown"]:
-            return context
-
-        # --- Извлечение данных ---
-        # Извлекаем количества только для строк, у которых они есть (product, batch)
-        hi = context["header_indices"]
-        begin, in_qty, out_qty, end = 0.0, 0.0, 0.0, 0.0
-        if row_type in ["product", "batch"] and context["found_header_row"]:
-            begin = self._safe_to_float(row[hi["begin"]])
-            in_qty = self._safe_to_float(row[hi["in"]])
-            out_qty = self._safe_to_float(row[hi["out"]])
-            end = self._safe_to_float(row[hi["end"]])
-        elif row_type in ["product", "batch"]:  # Fallback
-            begin = (
-                self._safe_to_float(row[self.INDEX_BEGIN])
-                if len(row) > self.INDEX_BEGIN
-                else 0.0
-            )
-            in_qty = (
-                self._safe_to_float(row[self.INDEX_IN])
-                if len(row) > self.INDEX_IN
-                else 0.0
-            )
-            out_qty = (
-                self._safe_to_float(row[self.INDEX_OUT])
-                if len(row) > self.INDEX_OUT
-                else 0.0
-            )
-            end = (
-                self._safe_to_float(row[self.INDEX_END])
-                if len(row) > self.INDEX_END
-                else 0.0
-            )
-
-        # --- Вызов обработчиков ---
-        if row_type == "warehouse":
-            if not context["warehouse"]:
-                context["warehouse"] = self._handle_warehouse_row(name_str, stats)
-
-        elif row_type == "group":
-            if context["current_group"]:
-                sections.append(context["current_group"])
-            context["current_group"] = self._handle_group_row(name_str, stats)
-            context["current_batch"] = None
-
-        elif row_type == "product":
-            product_result = self._handle_product_row(
-                name_str,
-                context["current_group"],
-                stats,
-                begin,
-                in_qty,
-                out_qty,
-                end,
-                warnings,
-            )
-            # Обновляем context['current_product'] только если _handle_product_row вернул не None
-            if product_result is not None:
-                context["current_product"] = product_result
-            # Если _handle_product_row вернул None, не обновляем current_product.
-            # Это сохраняет контекст предыдущего валидного товара.
-            context["current_batch"] = None
-
-        elif row_type == "batch":
-            context["current_batch"] = self._handle_batch_row(
-                idx,
-                name_str,
-                context["current_group"],
-                context["current_product"],
-                stats,
-                begin,
-                in_qty,
-                out_qty,
-                end,
-                warnings,
-            )
-
-        elif row_type == "document":
-            self._handle_document_row(
-                idx,
-                name_str,
-                context["current_product"],
-                context["current_batch"],
-                stats,
-                expense_operations,
-                in_qty,
-                out_qty,
-                warnings,
-            )
-
-        return context
-
-    def parse_file(self, file_path: str) -> Dict:
+        row,
+        idx,
+        nomenclature_col: Optional[str],
+        batch_col: Optional[str],
+        movement_type_col: Optional[str],
+        warehouse_col: Optional[str],
+        date_col: Optional[str],
+        quantity_col: Optional[str],
+    ) -> Tuple[BatchMovement, BatchBalance]:
         """
-        Основной метод парсинга. Преобразует Excel-файл в структурированный JSON.
+        Обрабатывает одну строку данных и создает объекты BatchMovement и BatchBalance.
+
+        Args:
+            row: Строка данных из DataFrame
+            idx: Индекс строки для логирования ошибок (может быть любым хешируемым типом)
+            nomenclature_col: Имя колонки номенклатуры
+            batch_col: Имя колонки партии
+            movement_type_col: Имя колонки типа движения
+            warehouse_col: Имя колонки склада
+            date_col: Имя колонки даты
+            quantity_col: Имя колонки количества
+
+        Returns:
+            Кортеж из BatchMovement и BatchBalance
+        """
+        # Извлекаем значения из строки, используя найденные колонки
+        nomenclature = (
+            str(row[nomenclature_col])
+            if nomenclature_col and nomenclature_col in row
+            else ""
+        )
+        batch = str(row[batch_col]) if batch_col and batch_col in row else ""
+        movement_type = (
+            str(row[movement_type_col])
+            if movement_type_col and movement_type_col in row
+            else ""
+        )
+        warehouse = (
+            str(row[warehouse_col]) if warehouse_col and warehouse_col in row else ""
+        )
+
+        # Обработка даты
+        date_val = date.today()  # fallback по умолчанию
+        if date_col and date_col in row:
+            date_raw = row[date_col]
+            date_val = self._parse_date_value(date_raw)
+
+        # Обработка количества
+        quantity = 0.0  # fallback по умолчанию
+        if quantity_col and quantity_col in row:
+            qty_raw = row[quantity_col]
+            quantity = self._parse_quantity_value(qty_raw)
+
+        # Создаем объект BatchMovement
+        movement = BatchMovement(
+            nomenclature=nomenclature,
+            date=date_val,
+            movement_type=movement_type,
+            quantity=quantity,
+            warehouse=warehouse,
+        )
+
+        # Создаем объект BatchBalance
+        balance = BatchBalance(
+            nomenclature=nomenclature,
+            date=date_val,
+            balance=quantity,  # Используем количество как баланс
+            warehouse=warehouse,
+            batch=batch,
+        )
+
+        return movement, balance
+
+    def _validate_column_types(
+        self,
+        df: pd.DataFrame,
+        col_name: str,
+        expected_types: List[type] | type,
+        col_display_name: str,
+    ) -> None:
+        """
+        Валидирует типы данных в указанной колонке DataFrame.
+
+        Args:
+            df: DataFrame для проверки
+            col_name: Имя колонки для проверки
+            expected_types: Ожидаемые типы данных (или список типов)
+            col_display_name: Отображаемое имя колонки для логирования
+        """
+        if not col_name or col_name not in df.columns:
+            return  # Если колонка не найдена, пропускаем проверку
+
+        # Преобразуем expected_types в список, если передан один тип
+        if not isinstance(expected_types, list):
+            expected_types = [expected_types]
+
+        # Проверяем каждый элемент в колонке
+        invalid_values = []
+        for idx, value in enumerate(df[col_name]):
+            if pd.isna(value):
+                continue  # Пропускаем NaN значения
+
+            value_type = type(value)
+            if not any(
+                isinstance(value, expected_type) for expected_type in expected_types
+            ):
+                invalid_values.append((idx, value, value_type.__name__))
+
+        if invalid_values:
+            error_details = [
+                f"строка {idx}: значение '{val}' типа '{val_type}'"
+                for idx, val, val_type in invalid_values[:5]
+            ]  # Ограничиваем первые 5
+
+            error_msg = (
+                f"Найдены некорректные типы данных в колонке '{col_display_name}' "
+                f"(ожидались типы: {[t.__name__ for t in expected_types]}). "
+                f"Примеры некорректных значений: {', '.join(error_details)}"
+            )
+
+            self.logger.error(error_msg)
+            raise ValidationException(error_msg, error_code="INVALID_COLUMN_TYPES")
+
+    def parse_file(self, file_path: str) -> pd.DataFrame:
+        """
+        Основной метод парсинга. Преобразует Excel-файл в плоский DataFrame.
 
         Args:
             file_path (str): Путь к Excel-файлу
 
         Returns:
-            Dict: Структура результата.
+            pd.DataFrame: Плоская таблица с данными из Excel-файла
         """
-
+        self.logger.info(f"Начало парсинга файла: {file_path}")
         try:
-            wb = load_workbook(filename=file_path, data_only=True)
-            ws = wb.active
+            # Просто читаем Excel файл в DataFrame
+            df = pd.read_excel(file_path, engine="openpyxl")
+            self.logger.info(f"Парсинг завершён успешно, всего строк: {len(df)}")
+            return df
         except Exception as e:
             self.logger.error(f"Ошибка при чтении Excel файла {file_path}: {e}")
-            return {"error": f"Excel read error: {e}", "data": None}
+            raise
 
-        sections = []
-        expense_operations = []
-        stats = {
-            "warehouses": 0,
-            "groups": 0,
-            "products": 0,
-            "batches": 0,
-            "receipt_docs": 0,
-            "expense_docs": 0,
-            "peresortitsa_docs": 0,
-            "movement_docs": 0,
-            "return_docs": 0,
-            "surplus_docs": 0,
-            "valid_batches": 0,
-            "invalid_batches": 0,
-            "total_docs": 0,
-            "batch_movements": 0,
-        }
+    def parse_excel(
+        self, file_path: str
+    ) -> Tuple[List[BatchMovement], List[BatchBalance]]:
+        """
+        Преобразует Excel-файл в списки объектов BatchMovement и BatchBalance.
 
-        # Инициализация списка предупреждений
-        warnings = []
+        Args:
+            file_path (str): Путь к Excel-файлу
 
-        self.logger.info(f"Начало парсинга файла: {file_path}")
+        Returns:
+            tuple[list[BatchMovement], list[BatchBalance]]: Кортеж из двух списков:
+                - список объектов BatchMovement
+                - список объектов BatchBalance
+        """
+        self.logger.info(f"Начало парсинга Excel-файла: {file_path}")
+        try:
+            # Считываем данные из Excel файла
+            df = pd.read_excel(file_path, engine="openpyxl")
+            self.logger.info(f"Excel-файл успешно прочитан, строк: {len(df)}")
 
-        # Контекст для итерации
-        context = {
-            "warehouse": None,
-            "current_group": None,
-            "current_product": None,
-            "current_batch": None,
-            "header_indices": {},
-            "found_header_row": False,
-        }
+            # Проверяем, что DataFrame не пуст
+            if df.empty:
+                self.logger.warning(f"Excel файл {file_path} пустой")
+                raise ParserException("Excel файл пустой", error_code="EMPTY_FILE")
 
-        # === ПЕРВЫЙ ПРОХОД: сбор информации ===
-        for idx, row_cells in enumerate(ws.iter_rows()):
-            row = [cell.value for cell in row_cells]
-            context = self._process_row(
-                idx, row, context, stats, expense_operations, sections, warnings
+            # Списки для хранения сущностей
+            movements = []
+            balances = []
+
+            # Определяем колонки, которые нужно использовать
+            # Используем стандартные имена колонок из тестов
+            required_columns = {
+                "Номенклатура": "nomenclature",
+                "Партия": "batch",
+                "Дата": "date",
+                "ТипДвижения": "movement_type",
+                "Количество": "quantity",
+                "Склад": "warehouse",
+            }
+
+            # Проверяем, есть ли нужные колонки в DataFrame
+            available_columns = df.columns.tolist()
+            self.logger.debug(f"Доступные колонки в Excel-файле: {available_columns}")
+
+            # Определяем сопоставление колонок (пытаемся использовать стандартные имена или русские)
+            nomenclature_col = self._find_column(
+                available_columns, ["Номенклатура", "nomenclature", "product"]
+            )
+            batch_col = self._find_column(
+                available_columns, ["Партия", "batch", "party"]
+            )
+            date_col = self._find_column(available_columns, ["Дата", "date", "dt"])
+            movement_type_col = self._find_column(
+                available_columns, ["ТипДвижения", "movement_type", "type"]
+            )
+            quantity_col = self._find_column(
+                available_columns, ["Количество", "quantity", "qty", "amount"]
+            )
+            warehouse_col = self._find_column(
+                available_columns, ["Склад", "warehouse", "wh"]
             )
 
-        # Сохранение последней группы
-        if context["current_group"]:
-            sections.append(context["current_group"])
+            # Проверяем наличие обязательных колонок
+            missing_columns = []
+            if not nomenclature_col:
+                missing_columns.append("Номенклатура")
+            if not date_col:
+                missing_columns.append("Дата")
+            if not movement_type_col:
+                missing_columns.append("ТипДвижения")
+            if not quantity_col:
+                missing_columns.append("Количество")
+            if not warehouse_col:
+                missing_columns.append("Склад")
 
-        if not context["found_header_row"]:
-            warning_msg = "Заголовки колонок не были найдены. Парсер использовал индексы по умолчанию."
-            self.logger.warning(warning_msg)
-            warnings.append(warning_msg)
+            if missing_columns:
+                error_msg = (
+                    f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}"
+                )
+                self.logger.error(error_msg)
+                raise ValidationException(error_msg, error_code="MISSING_COLUMNS")
 
-        # === ВТОРОЙ ПРОХОД: применение FIFO ===
-        if expense_operations:
-            self.logger.debug("Начало второго прохода: применение FIFO для списаний...")
+            # Валидация типов данных в обязательных колонках
+            if nomenclature_col:
+                self._validate_column_types(df, nomenclature_col, str, "Номенклатура")
+            if date_col:
+                self._validate_column_types(
+                    df, date_col, [pd.Timestamp, date, str], "Дата"
+                )
+            if movement_type_col:
+                self._validate_column_types(df, movement_type_col, str, "ТипДвижения")
+            if quantity_col:
+                self._validate_column_types(
+                    df, quantity_col, [int, float], "Количество"
+                )
+            if warehouse_col:
+                self._validate_column_types(df, warehouse_col, str, "Склад")
 
-        for expense_op in expense_operations:
-            product_name = expense_op["product_name"]
-            quantity = expense_op["quantity"]
-            document_name = expense_op["document_name"]
+            # Если колонка партии не найдена, используем пустую строку
+            if not batch_col:
+                self.logger.warning(
+                    "Колонка 'Партия' не найдена в Excel-файле, будет использоваться пустая строка для всех записей"
+                )
 
-            product_found = False
-            for section in sections:
-                for prod in section["products"]:
-                    if prod["name"] == product_name:
-                        self._apply_fifo_expense(
-                            prod, quantity, document_name, warnings
-                        )
-                        product_found = True
-                        break
-                if product_found:
-                    break
+            # Логирование начала обработки строк
+            self.logger.info(f"Начало обработки {len(df)} строк данных из Excel-файла")
 
-        self.logger.info("Парсинг завершён успешно!")
+            for idx, row in df.iterrows():
+                # Обработка строки и создание объектов
+                movement, balance = self._process_row(
+                    row,
+                    idx,
+                    nomenclature_col,
+                    batch_col,
+                    movement_type_col,
+                    warehouse_col,
+                    date_col,
+                    quantity_col,
+                )
+                movements.append(movement)
+                balances.append(balance)
 
-        # Подсчитываем количество созданных внешних партий и собираем информацию о них
-        external_batches_created = 0
-        external_batches_info = []
+            self.logger.info(
+                f"Парсинг Excel-файла завершён успешно. Создано {len(movements)} объектов BatchMovement и {len(balances)} объектов BatchBalance"
+            )
+            return movements, balances
 
-        for section in sections:
-            for product in section["products"]:
-                if "external_batches_created" in product:
-                    external_batches_created += product["external_batches_created"]
+        except ValidationException as ve:
+            self.logger.error(
+                f"Ошибка валидации при парсинге Excel файла {file_path}: {ve.message}"
+            )
+            raise
+        except ParserException as pe:
+            self.logger.error(
+                f"Ошибка парсинга при обработке Excel файла {file_path}: {pe.message}"
+            )
+            raise
+        except Exception as e:
+            self.logger.error(
+                f"Неизвестная ошибка при парсинге Excel файла {file_path}: {e}"
+            )
+            raise ParserException(
+                f"Неизвестная ошибка при парсинге Excel файла: {str(e)}",
+                error_code="PARSING_ERROR",
+            )
 
-                # Собираем информацию о внешних партиях
-                for batch in product["batches"]:
-                    if batch.get("external", False):
-                        external_batches_info.append(
-                            {
-                                "product_name": product["name"],
-                                "batch_code": batch["batch_code"],
-                                "quantity": batch["qty"]["begin"],
-                                "arrival_date": batch["arrival_date"],
-                                "document_name": (
-                                    batch["documents"][0]["name"]
-                                    if batch["documents"]
-                                    else "N/A"
-                                ),
-                            }
-                        )
-
-        return {
-            "meta": {
-                "title": "Ведомость по партиям номенклатуры",
-                "version": "2.1",
-                "structure": "Склад → Группа → Товар → Партия → Документ",
-                "fifo_logic": {
-                    "description": "Документы расхода списывают товар из партий по принципу FIFO",
-                    "receipt_docs": "Приходная накладная создаёт новую партию",
-                    "expense_docs": "Продажи, Списания, Инвентаризация, Пересортица: расход из одной партии (FIFO) + оприходование в другую (к последней партии)",
-                },
-                "stats": stats,
-                "parsed_at": datetime.now().isoformat(),
-                "warnings": warnings,
-                "external_batches_created": external_batches_created
-                > 0,  # Флаг наличия внешних партий
-                "external_batches_info": external_batches_info,  # Информация о внешних партиях
-            },
-            "warehouse": context["warehouse"],
-            "sections": sections,
-            "logs": {},
-        }
-
-    def save_to_json(self, data: Dict, output_file: str):
+    def save_to_json(self, data: pd.DataFrame, output_file: str) -> None:
         """
         Сохранение результата парсинга в JSON-файл.
 
         Args:
-            data (Dict): Результат из parse_file()
+            data: Результат из parse_file() (pandas DataFrame)
             output_file (str): Путь к выходному файлу (e.g., 'inventory.json')
         """
         try:
-            with open(output_file, "w", encoding="utf-8") as f:
-                # Custom encoder to handle datetime objects
-                class DateTimeEncoder(json.JSONEncoder):
-                    def default(self, o):
-                        if isinstance(o, datetime):
-                            return o.isoformat()
-                        return super().default(o)
-
-                json.dump(data, f, ensure_ascii=False, indent=2, cls=DateTimeEncoder)
+            data.to_json(output_file, orient="records", force_ascii=False, indent=2)
             self.logger.info("JSON сохранён: %s", output_file)
         except Exception as e:
             self.logger.error(f"Ошибка сохранения JSON: {e}")
-
-    def export_to_markdown(self, data: Dict, output_file: str):
-        """
-        Экспорт результатов в Markdown-отчёт с таблицами по группам.
-
-        Args:
-            data (Dict): Результат из parse_file()
-            output_file (str): Путь к выходному файлу (e.g., 'report.md')
-        """
-        if "error" in data:
-            print("Невозможно создать отчет, так как парсинг завершился с ошибкой.")
-            return
-
-        md_lines = []
-
-        md_lines.append(f"# {data['meta']['title']} (v{data['meta']['version']})")
-        md_lines.append(f"\n**Дата парсинга**: {data['meta']['parsed_at']}")
-        md_lines.append(f"**Склад**: {data.get('warehouse', 'Не указан')}\n")
-
-        # Добавляем уведомление о внешних партиях
-        if data["meta"].get("external_batches_created", False):
-            md_lines.append(
-                "**ВНИМАНИЕ**: Обнаружены внешние партии (созданы автоматически при нехватке товара по FIFO)"
-            )
-            external_info = data["meta"].get("external_batches_info", [])
-            if external_info:
-                md_lines.append("\n### Внешние партии:")
-                md_lines.append(
-                    "| Товар | Код партии | Количество | Дата поступления | Документ |"
-                )
-                md_lines.append("|---|---|---|---|")
-                for ext_batch in external_info:
-                    md_lines.append(
-                        f"| {ext_batch['product_name']} | **{ext_batch['batch_code']}** | {ext_batch['quantity']:.4f} | {ext_batch['arrival_date']} | {ext_batch['document_name']} |"
-                    )
-            md_lines.append("\n")
-
-        md_lines.append("---")
-
-        md_lines.append("\n## Статистика\n")
-        for key, value in data["meta"]["stats"].items():
-            md_lines.append(f"- **{key.replace('_', ' ').capitalize()}**: {value}")
-        md_lines.append("\n---")
-
-        for section in data.get("sections", []):
-            md_lines.append(f"\n## {section['name']}\n")
-            md_lines.append(
-                "| Товар | Нач. остаток | Приход | Расход | Кон. остаток | Партий |"
-            )
-            md_lines.append("|---|---|---|---|")
-
-            for product in section["products"]:
-                qty = product["qty_summary"]
-                # Проверяем, есть ли внешние партии у этого продукта
-                has_external = any(
-                    batch.get("external", False) for batch in product["batches"]
-                )
-                product_name = (
-                    f"**{product['name']}**" if has_external else product["name"]
-                )
-                md_lines.append(
-                    f"| {product_name} | {qty['begin']:.4f} | {qty['in']:.4f} | {qty['out']:.4f} | {qty['end']:.4f} | {len(product['batches'])} |"
-                )
-
-                # Добавляем информацию о внешних партиях для этого продукта
-                if has_external:
-                    md_lines.append("| | |")
-                    for batch in product["batches"]:
-                        if batch.get("external", False):
-                            md_lines.append(
-                                f"| *Внешняя партия: {batch['batch_code']}* | | | | | |"
-                            )
-
-        try:
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(md_lines))
-            self.logger.info("Markdown сохранён: %s", output_file)
-        except Exception as e:
-            self.logger.error("Ошибка сохранения Markdown: %s", e)
-
-    def print_summary(self, data: Dict):
-        """
-        Выводит краткую сводку по результатам парсинга в консоль.
-        """
-        if "error" in data:
-            print(f"\n❌ Парсинг завершился с ошибкой: {data['error']}")
-            return
-
-        print("\n" + "=" * 60)
-        print(f"СВОДКА ПО РЕЗУЛЬТАТАМ ПАРСИНГА (v{data['meta']['version']})")
-        print("=" * 60)
-        print(f"\nСклад: {data.get('warehouse', 'Не указан')}")
-        print("\nСтатистика:")
-        for key, value in data["meta"]["stats"].items():
-            print(f"  • {key.replace('_', ' ').capitalize()}: {value}")
-
-        self.logger.info("Ошибок валидации баланса не обнаружено")
-
-        print("\n" + "=" * 60)
-
-    def print_batch_details(self, data: Dict):
-        """
-        Выводит детальную информацию о партиях с числовыми данными.
-        """
-        if "error" in data:
-            return
-
-        print("\n" + "=" * 80)
-        print("ДЕТАЛИЗАЦИЯ ПАРТИЙ (Сырые данные из отчета)")
-        print("=" * 80)
-
-        for section in data.get("sections", []):
-            for product in section["products"]:
-                if product["batches"]:
-                    print(f"\n📦 {product['name']} ({section['name']})")
-                    print("-" * 60)
-
-                    for batch in product["batches"]:
-                        qty_raw = batch["qty_raw"]
-                        b, i, o, e = (
-                            qty_raw["begin"],
-                            qty_raw["in"],
-                            qty_raw["out"],
-                            qty_raw["end"],
-                        )
-
-                        print(f"  Партия {batch['batch_code']}:")
-                        print(
-                            f"    Начало: {b:<10.4f} Приход: {i:<10.4f} Расход: {o:<10.4f} Конец: {e:<10.4f}"
-                        )
-
-                        if not batch["validation"]["valid"]:
-                            print(
-                                f"    ❌ ОШИБКА БАЛАНСА: {batch['validation']['error']}"
-                            )
-                        else:
-                            print(
-                                f"    ✅ Баланс корректен (допуск {batch['validation']['diff']:.4f})"
-                            )

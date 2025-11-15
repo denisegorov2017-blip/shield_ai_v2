@@ -2,12 +2,21 @@
 Управление сессиями SQLAlchemy 2.0 (синхронное)
 """
 
-from contextlib import contextmanager
-from typing import Generator
+from contextlib import (
+    contextmanager,
+)
+from typing import (
+    Generator,
+)
 
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import (
+    Session,
+    sessionmaker,
+)
 
-from .base import engine
+from .base import (
+    engine,
+)
 
 # Session factory
 SessionLocal = sessionmaker(

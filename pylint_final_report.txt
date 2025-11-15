@@ -1,0 +1,135 @@
+************* Module shield_ai.main_calibrate
+src/shield_ai/main_calibrate.py:8:0: C0413: Import "from shield_ai.application.use_cases.calibrate_coefficients import CalibrateCoefficientsUseCase" should be placed at the top of the module (wrong-import-position)
+src/shield_ai/main_calibrate.py:9:0: C0413: Import "from shield_ai.infrastructure.database.session import get_session" should be placed at the top of the module (wrong-import-position)
+src/shield_ai/main_calibrate.py:10:0: C0413: Import "from shield_ai.infrastructure.repositories.calibration_repository import SQLAlchemyCalibrationDataRepository" should be placed at the top of the module (wrong-import-position)
+src/shield_ai/main_calibrate.py:13:0: C0413: Import "from shield_ai.infrastructure.repositories.coefficient_repository import SQLAlchemyCoefficientRepository" should be placed at the top of the module (wrong-import-position)
+src/shield_ai/main_calibrate.py:16:0: C0413: Import "from shield_ai.infrastructure.repositories.product_repository import SQLAlchemyProductRepository" should be placed at the top of the module (wrong-import-position)
+************* Module shield_ai.infrastructure.repositories.coefficient_repository
+src/shield_ai/infrastructure/repositories/coefficient_repository.py:49:12: C0415: Import outside toplevel (datetime.datetime) (import-outside-toplevel)
+
+
+Report
+======
+373 statements analysed.
+
+Statistics by type
+------------------
+
++---------+-------+-----------+-----------+------------+---------+
+|type     |number |old number |difference |%documented |%badname |
++=========+=======+===========+===========+============+=========+
+|module   |25     |25         |=          |88.00       |0.00     |
++---------+-------+-----------+-----------+------------+---------+
+|class    |26     |26         |=          |84.62       |0.00     |
++---------+-------+-----------+-----------+------------+---------+
+|method   |27     |27         |=          |88.89       |0.00     |
++---------+-------+-----------+-----------+------------+---------+
+|function |6      |6          |=          |83.33       |0.00     |
++---------+-------+-----------+-----------+------------+---------+
+
+
+
+External dependencies
+---------------------
+::
+
+    numpy (shield_ai.application.use_cases.calibrate_coefficients)
+      \-typing (shield_ai.application.use_cases.calibrate_coefficients)
+    pandas (shield_ai.infrastructure.parsers.inventory_parser)
+    scipy 
+      \-optimize (shield_ai.application.use_cases.calibrate_coefficients)
+    shield_ai 
+      \-domain 
+      | \-entities 
+      | | \-product (shield_ai.application.use_cases.calibrate_coefficients,shield_ai.infrastructure.repositories.product_repository)
+      | | \-shrinkage_profile (shield_ai.application.use_cases.calibrate_coefficients,shield_ai.application.use_cases.forecast_shrinkage,shield_ai.infrastructure.repositories.coefficient_repository)
+      | \-repositories (shield_ai.application.use_cases.calibrate_coefficients,shield_ai.infrastructure.repositories.calibration_repository,shield_ai.infrastructure.repositories.coefficient_repository,shield_ai.infrastructure.repositories.product_repository)
+      | \-shrinkage 
+      |   \-strategies (shield_ai.application.use_cases.forecast_shrinkage)
+      \-infrastructure 
+        \-database 
+          \-models (shield_ai.application.use_cases.forecast_shrinkage,shield_ai.infrastructure.repositories.calibration_repository,shield_ai.infrastructure.repositories.coefficient_repository,shield_ai.infrastructure.repositories.product_repository)
+    sqlalchemy (shield_ai.application.use_cases.forecast_shrinkage,shield_ai.infrastructure.database.base,shield_ai.infrastructure.database.models,shield_ai.infrastructure.repositories.coefficient_repository,shield_ai.infrastructure.repositories.product_repository)
+      \-orm (shield_ai.application.use_cases.forecast_shrinkage,shield_ai.infrastructure.database.base,shield_ai.infrastructure.database.models,shield_ai.infrastructure.database.session,shield_ai.infrastructure.repositories.calibration_repository,shield_ai.infrastructure.repositories.coefficient_repository,shield_ai.infrastructure.repositories.product_repository)
+
+
+
+1052 lines have been analyzed
+
+Raw metrics
+-----------
+
++----------+-------+------+---------+-----------+
+|type      |number |%     |previous |difference |
++==========+=======+======+=========+===========+
+|code      |555    |52.76 |NC       |NC         |
++----------+-------+------+---------+-----------+
+|docstring |283    |26.90 |NC       |NC         |
++----------+-------+------+---------+-----------+
+|comment   |24     |2.28  |NC       |NC         |
++----------+-------+------+---------+-----------+
+|empty     |190    |18.06 |NC       |NC         |
++----------+-------+------+---------+-----------+
+
+
+
+Duplication
+-----------
+
++-------------------------+------+---------+-----------+
+|                         |now   |previous |difference |
++=========================+======+=========+===========+
+|nb duplicated lines      |0     |0        |0          |
++-------------------------+------+---------+-----------+
+|percent duplicated lines |0.000 |0.000    |=          |
++-------------------------+------+---------+-----------+
+
+
+
+Messages by category
+--------------------
+
++-----------+-------+---------+-----------+
+|type       |number |previous |difference |
++===========+=======+=========+===========+
+|convention |6      |6        |6          |
++-----------+-------+---------+-----------+
+|refactor   |0      |0        |0          |
++-----------+-------+---------+-----------+
+|warning    |0      |0        |0          |
++-----------+-------+---------+-----------+
+|error      |0      |16       |16         |
++-----------+-------+---------+-----------+
+
+
+
+% errors / warnings by module
+-----------------------------
+
++-------------------------------------------------------------+------+--------+---------+-----------+
+|module                                                       |error |warning |refactor |convention |
++=============================================================+======+========+=========+===========+
+|shield_ai.main_calibrate                                     |0.00  |0.00    |0.00     |83.33      |
++-------------------------------------------------------------+------+--------+---------+-----------+
+|shield_ai.infrastructure.repositories.coefficient_repository |0.00  |0.00    |0.00     |16.67      |
++-------------------------------------------------------------+------+--------+---------+-----------+
+
+
+
+Messages
+--------
+
++------------------------+------------+
+|message id              |occurrences |
++========================+============+
+|wrong-import-position   |5           |
++------------------------+------------+
+|import-outside-toplevel |1           |
++------------------------+------------+
+
+
+
+
+------------------------------------------------------------------
+Your code has been rated at 9.84/10 (previous run: 7.69/10, +2.14)
+

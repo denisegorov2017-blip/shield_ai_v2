@@ -1,0 +1,14 @@
+[
+  {
+    "nomenclature": "Товар 2",
+    "calculated_shrinkage": -50.0,
+    "actual_balance": 50.0,
+    "deviation": 0
+  },
+  {
+    "nomenclature": "Товар 1",
+    "calculated_shrinkage": 10.0,
+    "actual_balance": 10.0,
+    "deviation": 0.5
+  }
+]

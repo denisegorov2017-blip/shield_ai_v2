@@ -5,8 +5,12 @@ SQLAlchemy 2.0 base configuration
 
 import os
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import (
+    create_engine,
+)
+from sqlalchemy.orm import (
+    DeclarativeBase,
+)
 
 # Database URL
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ocean_shop.db")

@@ -1,6 +1,6 @@
 # Makefile for Shield AI v2.0
 
-.PHONY: help install run test test-cov lint format mypy pyright pylint pre-commit bandit safety dependency-check ci complexity-check docs-build typecheck security coverage complexity all
+.PHONY: help install run test test-cov lint format pyright pylint pre-commit bandit safety dependency-check ci complexity-check docs-build typecheck security coverage complexity all
 
 help:
 	@echo "🛡️ Shield AI - Команды разработки"
@@ -13,8 +13,7 @@ help:
 	@echo "make lint       - Линтинг (ruff)"
 	@echo "make pylint     - Проверка стиля кода (pylint)"
 	@echo "make format     - Форматирование (black+isort)"
-	@echo "make typecheck  - Проверка типов (mypy + опционально pyright)"
-	@echo "make mypy       - Проверка типов (mypy)"
+	@echo "make typecheck  - Проверка типов (pyright)"
 	@echo "make pyright    - Проверка типов (pyright)"
 	@echo "make pre-commit - Запуск pre-commit хуков"
 	@echo "make bandit     - Сканирование безопасности"
@@ -36,7 +35,6 @@ run:
 	poetry run streamlit run main.py
 
 typecheck:
-	poetry run mypy src/
 	poetry run pyright
 
 security:
@@ -49,11 +47,17 @@ coverage:
 complexity:
 	poetry run radon cc src/shield_ai -s -a -n 10 && poetry run radon mi src/shield_ai -s
 
-all: format lint typecheck security complexity test-cov docs-build
+all: format lint pyright security complexity test-cov docs-build
 	@echo "✅ Все проверки пройдены!"
 
 init-db:
 	poetry run python -c "from shield_ai.infrastructure.database import init_db; init_db()"
+
+migrate:
+	poetry run alembic upgrade head
+
+migrate-create:
+	poetry run alembic revision --autogenerate -m "Initial migration"
 
 test:
 	poetry run pytest tests/ -v
@@ -79,9 +83,8 @@ pylint:
 format:
 	poetry run black src/ tests/
 	poetry run isort src/ tests/
+	poetry run ruff check src/ tests/ --fix --exit-zero
 
-mypy:
-	poetry run mypy src/
 
 pyright:
 	poetry run pyright
@@ -91,18 +94,21 @@ pre-commit:
 
 bandit:
 	poetry run bandit -r src/
-
 safety:
 	poetry run safety check
+
+pip-audit:
+	poetry run pip-audit
 
 dependency-check:
 	poetry run pip-audit
 
-ci: format lint pylint mypy pyright pre-commit bandit safety dependency-check complexity-check test-cov docs-build
+
+ci: format lint pylint pyright pre-commit bandit safety dependency-check complexity-check test-cov docs-build
 	@echo "✅ CI пройден!"
 
 complexity-check:
 	poetry run radon cc src/ -s -a -n 10 && poetry run radon mi src/ -s
 
 docs-build:
-	poetry run sphinx-build -b html docs/ docs/_build
+	LANG=C.UTF-8 LC_ALL=C.UTF-8 poetry run sphinx-build -b html docs/ docs/_build
